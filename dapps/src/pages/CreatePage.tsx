@@ -5,7 +5,6 @@ import { LoaderBars } from "../components/LoaderBars";
 import { ThreatBadge } from "../components/ThreatBadge";
 import { useCreateBounty } from "../hooks/useCreateBounty";
 import {
-  IS_CONTRACT_DEPLOYED,
   LUX_COIN_TYPE,
   EVE_COIN_TYPE,
   TREASURY_LUX_ID,
@@ -95,31 +94,25 @@ export function CreatePage() {
   async function handleSubmit() {
     if (!account || !analysis || !amount) return;
 
-    if (IS_CONTRACT_DEPLOYED) {
-      const coinType    = asset === "LUX" ? LUX_COIN_TYPE : EVE_COIN_TYPE;
-      const treasuryId  = asset === "LUX" ? TREASURY_LUX_ID : TREASURY_EVE_ID;
-      const durationMs  = BigInt(Number(duration) * 3600 * 1000);
-      // Amount in smallest unit (assuming 6 decimals for LUX; adjust per actual coin)
-      const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000));
+    const coinType    = asset === "LUX" ? LUX_COIN_TYPE : EVE_COIN_TYPE;
+    const treasuryId  = asset === "LUX" ? TREASURY_LUX_ID : TREASURY_EVE_ID;
+    const durationMs  = BigInt(Number(duration) * 3600 * 1000);
+    // Amount in smallest unit (assuming 6 decimals for LUX; adjust per actual coin)
+    const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000));
 
-      try {
-        const result = await createBounty({
-          treasuryId,
-          coinType,
-          targetCharacterId: targetId,
-          threatLevel: analysis.threatLevel,
-          coinObjectIds: [], // TODO: populate from wallet coin objects via useCurrentAccount
-          paymentAmount: rawAmount,
-          durationMs,
-        });
-        if (result) setTxDigest((result as { digest?: string }).digest ?? "submitted");
-      } catch {
-        // txError will reflect the failure
-      }
-    } else {
-      // Preview mode stub
-      await new Promise((r) => setTimeout(r, 2000));
-      setTxDigest("PREVIEW_MODE — contract not yet deployed");
+    try {
+      const result = await createBounty({
+        treasuryId,
+        coinType,
+        targetCharacterId: targetId,
+        threatLevel: analysis.threatLevel,
+        coinObjectIds: [], // TODO: populate from wallet coin objects via useCurrentAccount
+        paymentAmount: rawAmount,
+        durationMs,
+      });
+      if (result) setTxDigest((result as { digest?: string }).digest ?? "submitted");
+    } catch {
+      // txError will reflect the failure
     }
   }
 
@@ -130,9 +123,7 @@ export function CreatePage() {
           Post <span className="dim">Bounty</span>
         </h1>
         <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
-          {IS_CONTRACT_DEPLOYED
-            ? "Stake LUX or EVE Token against a target character. Rewards held in trustless escrow."
-            : "⚠ Preview mode — contract not deployed. Submission is simulated."}
+          Stake LUX or EVE Token against a target character. Rewards held in trustless escrow.
         </p>
       </div>
 

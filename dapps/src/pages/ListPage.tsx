@@ -1,24 +1,13 @@
 import { useState } from "react";
 import { Search, Filter, ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
 import { ThreatBadge } from "../components/ThreatBadge";
-import { useBounties, OnChainBounty } from "../hooks/useBounties";
-import { IS_CONTRACT_DEPLOYED } from "../constants";
-
-// Mock fallback — shown when the contract is not yet deployed
-const MOCK_BOUNTIES: OnChainBounty[] = [
-  { id: "b1", issuer: "7778881", targetCharacterId: "Kyla Vheren",      rewardAmount: "5,000",  coinType: "eve_token", asset: "EVE", expiryTimestampMs: Date.now() + 48*3600000, threatLevel: 4, threatClass: "S", isClaimed: false },
-  { id: "b2", issuer: "9992224", targetCharacterId: "Siren's Call",      rewardAmount: "1,200",  coinType: "lux",       asset: "LUX", expiryTimestampMs: Date.now() +  8*3600000, threatLevel: 2, threatClass: "B", isClaimed: false },
-  { id: "b3", issuer: "Admin",   targetCharacterId: "Malfunctioning AI", rewardAmount: "10,000", coinType: "eve_token", asset: "EVE", expiryTimestampMs: Date.now() + 96*3600000, threatLevel: 4, threatClass: "S", isClaimed: false },
-  { id: "b4", issuer: "1234567", targetCharacterId: "Miner X-Ray",       rewardAmount: "450",    coinType: "lux",       asset: "LUX", expiryTimestampMs: Date.now() -  1*3600000, threatLevel: 1, threatClass: "C", isClaimed: true },
-];
+import { useBounties } from "../hooks/useBounties";
 
 export function ListPage() {
   const [search, setSearch] = useState("");
   const { bounties: onChainBounties, loading, error } = useBounties();
 
-  // Use on-chain data when deployed, mock otherwise
-  const source = IS_CONTRACT_DEPLOYED ? onChainBounties : MOCK_BOUNTIES;
-  const filtered = source.filter((b) =>
+  const filtered = onChainBounties.filter((b) =>
     b.targetCharacterId.toLowerCase().includes(search.toLowerCase()) ||
     b.issuer.toLowerCase().includes(search.toLowerCase()),
   );
@@ -32,9 +21,7 @@ export function ListPage() {
             Contract <span className="dim">Board</span>
           </h1>
           <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
-            {IS_CONTRACT_DEPLOYED
-              ? "Live on-chain kill contracts within Frontier nodes."
-              : "⚠ Preview mode — contract not yet deployed. Showing mock data."}
+            Live on-chain kill contracts within Frontier nodes.
           </p>
         </div>
 

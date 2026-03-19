@@ -5,9 +5,7 @@
  */
 
 // ─── EVE Frontier World (testnet) ────────────────────────────────────────────
-export const WORLD_PACKAGE_ID: string =
-  import.meta.env.VITE_EVE_WORLD_PACKAGE_ID ??
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const WORLD_PACKAGE_ID: string = import.meta.env.VITE_EVE_WORLD_PACKAGE_ID;
 
 // LUX coin type (game-internal credit)
 export const LUX_COIN_TYPE = `${WORLD_PACKAGE_ID}::lux::LUX`;
@@ -19,26 +17,19 @@ export const EVE_COIN_TYPE = `${WORLD_PACKAGE_ID}::eve_token::EVE_TOKEN`;
 export const PLAYER_PROFILE_TYPE = `${WORLD_PACKAGE_ID}::character::PlayerProfile`;
 
 // Sui GraphQL endpoint
-export const GRAPHQL_URL: string =
-  import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT ??
-  "https://graphql.testnet.sui.io/graphql";
+export const GRAPHQL_URL: string = import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT;
 
 // ─── BigShot Extension (fill in after deploy) ────────────────────────────────
-export const BIGSHOT_PACKAGE_ID: string =
-  import.meta.env.VITE_BIGSHOT_PACKAGE_ID ?? "";
+export const BIGSHOT_PACKAGE_ID: string = import.meta.env.VITE_BIGSHOT_PACKAGE_ID;
 
-export const EXTENSION_CONFIG_ID: string =
-  import.meta.env.VITE_EXTENSION_CONFIG_ID ?? "";
+export const EXTENSION_CONFIG_ID: string = import.meta.env.VITE_EXTENSION_CONFIG_ID;
 
-export const TREASURY_LUX_ID: string =
-  import.meta.env.VITE_TREASURY_LUX_ID ?? "";
+export const TREASURY_LUX_ID: string = import.meta.env.VITE_TREASURY_LUX_ID;
 
-export const TREASURY_EVE_ID: string =
-  import.meta.env.VITE_TREASURY_EVE_ID ?? "";
+export const TREASURY_EVE_ID: string = import.meta.env.VITE_TREASURY_EVE_ID;
 
 // ─── Sui system constants ─────────────────────────────────────────────────────
-export const SUI_CLOCK_OBJECT_ID =
-  "0x0000000000000000000000000000000000000000000000000000000000000006";
+export const SUI_CLOCK_OBJECT_ID = "0x0000000000000000000000000000000000000000000000000000000000000006";
 
 /** True when all BigShot contract IDs have been configured */
 export const IS_CONTRACT_DEPLOYED =

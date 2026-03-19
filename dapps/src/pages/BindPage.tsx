@@ -1,25 +1,17 @@
-import { useState } from "react";
 import { Link2, User, CheckCircle2, Loader2 } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { useConnection } from "@evefrontier/dapp-kit";
+import { useCharacterId } from "../hooks/useCharacterId";
 
 export function BindPage() {
   const account = useCurrentAccount();
   const { handleConnect } = useConnection();
 
-  const [characterId, setCharacterId] = useState<string | null>(null);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
+  const { resolve, characterId, loading, error: resolveError } = useCharacterId();
 
   async function fetchCharacterId() {
     if (!account) return;
-    setLoading(true);
-    setError("");
-    // TODO: replace with getOwnedObjectsByType(walletAddress, `${WORLD_PACKAGE_ID}::character::PlayerProfile`)
-    await new Promise((r) => setTimeout(r, 1800));
-    // Mock result
-    setCharacterId("7778881");
-    setLoading(false);
+    await resolve(account.address);
   }
 
   return (
@@ -60,8 +52,8 @@ export function BindPage() {
           </div>
         )}
 
-        {error && (
-          <p style={{ fontSize: "0.7rem", color: "var(--martian-red)" }}>{error}</p>
+        {resolveError && (
+          <p style={{ fontSize: "0.7rem", color: "var(--martian-red)" }}>{resolveError}</p>
         )}
 
         {/* How it works */}

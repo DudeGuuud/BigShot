@@ -13,7 +13,6 @@ const THREAT_MAP: Record<number, "S" | "A" | "B" | "C" | "D"> = {
 
 /**
  * Fetches a single Bounty object by its on-chain object ID.
- * When id starts with 'b' (mock IDs), returns null to let the caller use defaults.
  */
 export function useBountyDetail(objectId: string) {
   const [bounty, setBounty]   = useState<OnChainBounty | null>(null);
@@ -21,8 +20,7 @@ export function useBountyDetail(objectId: string) {
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    // Skip mock IDs (b1, b2, b3...) used during development
-    if (!objectId || objectId.length < 10) {
+    if (!objectId) {
       return;
     }
 

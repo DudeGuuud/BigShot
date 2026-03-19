@@ -7,12 +7,6 @@ import { useClaimBounty } from "../hooks/useClaimBounty";
 import { IS_CONTRACT_DEPLOYED } from "../constants";
 
 // Mock fallback for dev/preview
-const MOCK_MAP: Record<string, { target: string; amount: string; asset: string; issuer: string; threat: "S" | "A" | "B" | "C" | "D"; expiryMs: number }> = {
-  b1: { target: "Kyla Vheren",      amount: "5,000",  asset: "EVE Token", issuer: "7778881", threat: "S", expiryMs: Date.now() + 48 * 3600000 },
-  b2: { target: "Siren's Call",      amount: "1,200",  asset: "LUX",       issuer: "9992224", threat: "B", expiryMs: Date.now() +  8 * 3600000 },
-  b3: { target: "Malfunctioning AI", amount: "10,000", asset: "EVE Token", issuer: "Admin",   threat: "S", expiryMs: Date.now() + 96 * 3600000 },
-};
-
 function formatCountdown(ms: number) {
   if (ms <= 0) return "EXPIRED";
   const h = Math.floor(ms / 3600000);
@@ -24,20 +18,39 @@ function formatCountdown(ms: number) {
 export function BountyDetailPage({ id }: { id: string }) {
   const account = useCurrentAccount();
 
-  // On-chain fetch — only used for real object IDs (0x...), falls back to mock for short IDs
+  // On-chain fetch
   const { bounty: onChainBounty, loading: bountyLoading } = useBountyDetail(id);
   const { claimBounty, loading: claiming, error: claimError } = useClaimBounty();
 
-  const mock = MOCK_MAP[id];
-  const isOnChain = IS_CONTRACT_DEPLOYED && !!onChainBounty;
+  if (bountyLoading) {
+    return (
+      <div style={{ paddingTop: "5rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem" }}>
+        <Loader2 size={20} style={{ animation: "spin 1s linear infinite", color: "var(--brand)" }} />
+        <span style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--brand)" }}>
+          Loading Contract…
+        </span>
+      </div>
+    );
+  }
 
-  // Display data — prefer on-chain, fallback to mock, fallback to unknown
-  const displayTarget  = isOnChain ? onChainBounty!.targetCharacterId : (mock?.target ?? "Unknown Target");
-  const displayAmount  = isOnChain ? onChainBounty!.rewardAmount       : (mock?.amount ?? "—");
-  const displayAsset   = isOnChain ? onChainBounty!.asset               : (mock?.asset ?? "LUX");
-  const displayIssuer  = isOnChain ? onChainBounty!.issuer              : (mock?.issuer ?? "Unknown");
-  const displayThreat  = isOnChain ? onChainBounty!.threatClass          : (mock?.threat ?? "D");
-  const expiryMs       = isOnChain ? onChainBounty!.expiryTimestampMs   : (mock?.expiryMs ?? Date.now());
+  if (!onChainBounty) {
+    return (
+      <div style={{ paddingTop: "5rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
+        <AlertTriangle size={40} style={{ color: "var(--amber)" }} />
+        <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.5)" }}>Contract not found on-chain.</p>
+        <a href="#/list" className="eve-btn">Return to Board</a>
+      </div>
+    );
+  }
+
+  const {
+    targetCharacterId: displayTarget,
+    rewardAmount: displayAmount,
+    asset: displayAsset,
+    issuer: displayIssuer,
+    threatClass: displayThreat,
+    expiryTimestampMs: expiryMs,
+  } = onChainBounty;
 
   const [countdown, setCountdown] = useState(expiryMs - Date.now());
   const [killmailId, setKillmailId] = useState("");
