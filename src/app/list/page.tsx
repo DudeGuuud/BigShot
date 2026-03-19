@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Filter, ArrowUpRight, Timer, Target } from "lucide-react";
+import { Search, Filter, ArrowUpRight } from "lucide-react";
 
 const MOCK_BOUNTIES = [
   { id: "b1", target: "Kyla Vheren", issuerId: "7778881", amount: "5,000", asset: "EVE", status: "Active", threat: "S" },

@@ -15,7 +15,7 @@ export default function BountyDetailsPage({ params }: { params: { id: string } }
     id: params.id,
     target: params.id === "b1" ? "Kyla Vheren" : "Designated Target",
     amount: "5,000",
-    asset: "EVE",
+    asset: "EVE Token",
     threat: "S",
     issuer: "Character_7778881",
     created: "2026-03-15",
@@ -40,7 +40,17 @@ export default function BountyDetailsPage({ params }: { params: { id: string } }
         {/* Left Column: Contract Details */}
         <div className="flex-1 space-y-10">
           <div className="space-y-4">
-            <div className={`w-12 h-12 flex items-center justify-center font-bold text-black text-lg ${bounty.threat === 'S' ? 'bg-martian-red' : 'bg-eve-cream'}`}>
+            <div 
+              className="w-12 h-12 flex items-center justify-center font-bold text-black text-lg transition-colors"
+              style={{
+                backgroundColor: 
+                  bounty.threat === 'S' ? '#FF2A2A' : 
+                  bounty.threat === 'A' ? '#FF9100' : 
+                  bounty.threat === 'B' ? '#FFD700' : 
+                  bounty.threat === 'C' ? '#00E5FF' : 
+                  '#A0A0A0'
+              }}
+            >
               {bounty.threat}
             </div>
             <h1 className="page-title mb-0">{bounty.target}</h1>
@@ -96,7 +106,7 @@ export default function BountyDetailsPage({ params }: { params: { id: string } }
                     <CheckCircle2 size={32} />
                   </div>
                   <h3 className="text-lg font-bold uppercase tracking-widest text-green-500">Contract Settled</h3>
-                  <p className="text-xs text-eve-cream/40">Reward assets have been transferred to the verified hunter.</p>
+                  <p className="text-xs text-eve-cream/40">Reward assets have been trustlessly released to the hunter address.</p>
                 </div>
                 <Link href="/list" className="eve-btn w-full text-xs">Return to Board</Link>
               </div>
@@ -104,11 +114,11 @@ export default function BountyDetailsPage({ params }: { params: { id: string } }
               <div className="space-y-6">
                 <div className="space-y-4">
                   <p className="text-xs text-eve-cream/50 leading-relaxed">
-                    To claim the reward, cryptographic proof of the kill (Killmail) must be submitted via the Frontier Neural Link.
+                    To claim the reward, the native <strong>Frontier Killmail Object</strong> must be submitted via the neural link.
                   </p>
-                  <div className="industrial-panel bg-eve-black p-4 border-dashed">
+                  <div className="industrial-panel bg-eve-black p-4 border-dashed border-martian-red/20">
                     <p className="text-[10px] text-eve-cream/20 uppercase font-bold text-center italic">
-                      [Drop Killmail Proof Here]
+                      [SUBMIT KILLMAIL OBJECT]
                     </p>
                   </div>
                 </div>
@@ -121,7 +131,7 @@ export default function BountyDetailsPage({ params }: { params: { id: string } }
                   {isSettling ? (
                     <>
                       <Loader2 className="animate-spin mr-2" size={14} />
-                      Verifying Proof...
+                      Verifying Killmail...
                     </>
                   ) : (
                     "Submit Killmail & Settle"

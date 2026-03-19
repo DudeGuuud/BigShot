@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoveRight, Target, Activity, Zap, ShieldAlert, Cpu } from "lucide-react";
-import Link from "next/link";
+import { Target, Activity, Zap, ShieldAlert, Cpu } from "lucide-react";
 
 export default function CreateBountyPage() {
   const [targetId, setTargetId] = useState("");
@@ -15,19 +14,49 @@ export default function CreateBountyPage() {
     if (!targetId) return;
     setIsAnalyzing(true);
     setAnalysis(null);
+    
+    // Rule-based formula mockup
+    // 1. Calculate weighted metrics based on ID (deterministic for mockup)
+    const hash = targetId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const activity = (hash % 100);
+    const value = (hash * 13) % 10000;
+    const aggression = (hash % 10);
+    
+    let threatClass = "D";
+    let riskLevel = "LOW";
+    if (activity > 80 || value > 8000 ) {
+      threatClass = "S";
+      riskLevel = "94.2% CRITICAL";
+    } else if (activity > 60 || value > 5000) {
+      threatClass = "A";
+      riskLevel = "75.5% HIGH";
+    } else if (activity > 40) {
+      threatClass = "B";
+      riskLevel = "50.0% ELEVATED";
+    } else if (activity > 20) {
+      threatClass = "C";
+      riskLevel = "25.0% MODERATE";
+    }
+
     setTimeout(() => {
       setIsAnalyzing(false);
-      setAnalysis(`[TACTICAL EVALUATION COMPLETE]
+      setAnalysis(`[TACTICAL EVALUATION: FORMULA v4.2]
 -----------------------------------------
 ID: ${targetId}
-THREAT CLASS: S (EXTREME)
-RISK LEVEL: 94.2% CRITICAL
+METRICS:
+- PILOT ACTIVITY: ${activity}% (WEIGHT: 0.4)
+- ASSET VALUE: ${value.toLocaleString()} LUX (WEIGHT: 0.5)
+- AGGRESSION INDEX: ${aggression}/10 (WEIGHT: 0.1)
+
+RESULT:
+THREAT CLASS: ${threatClass}
+RISK LEVEL: ${riskLevel}
 -----------------------------------------
-VULNERABILITY DETECTED: 
-Target exhibits consistent transit routes through 
-unsecured wormhole nodes. Recommendation: 
-Deploy Interdictor-class bubbles at gate 0-G8TT.`);
-    }, 2000);
+VULNERABILITY: 
+Target exhibits consistent patterns. 
+Recommendation: Deploy specialized interdiction 
+at suspected transit nodes.`);
+    }, 1500);
   };
 
   return (
@@ -65,8 +94,8 @@ Deploy Interdictor-class bubbles at gate 0-G8TT.`);
                     onChange={(e) => setAsset(e.target.value)}
                     className="w-full bg-eve-black border border-eve-cream/10 p-3 text-sm focus:border-martian-red/50 outline-none transition-colors appearance-none"
                   >
-                    <option value="SUI">SUI_NETWORK</option>
-                    <option value="EVE">EVE_TOKEN</option>
+                    <option value="LUX">LUX (CREDIT)</option>
+                    <option value="EVE">EVE TOKEN</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -103,7 +132,7 @@ Deploy Interdictor-class bubbles at gate 0-G8TT.`);
         <section className="space-y-6">
           <div className="industrial-panel h-full flex flex-col min-h-[300px]">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-martian-red flex items-center gap-2 mb-6">
-              <Cpu size={16} /> 02 // Tactical Briefing (LLM)
+              <Cpu size={16} /> 02 // Tactical Intelligence
             </h2>
 
             {isAnalyzing ? (
