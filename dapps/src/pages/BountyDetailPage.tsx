@@ -5,7 +5,7 @@ import { ThreatBadge } from "../components/ThreatBadge";
 import { useBountyDetail } from "../hooks/useBountyDetail";
 import { useClaimBounty } from "../hooks/useClaimBounty";
 import { IS_CONTRACT_DEPLOYED } from "../constants";
-import { formatCountdown } from "utils/formatters";
+import { formatCountdown } from "../utils/formatters";
 import { useBigShot } from "../context/BigShotContext";
 
 export function BountyDetailPage({ id }: { id: string }) {
