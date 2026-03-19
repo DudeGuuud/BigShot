@@ -1,20 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { ThreatBadge } from "../components/ThreatBadge";
+import { useBountyDetail } from "../hooks/useBountyDetail";
+import { useClaimBounty } from "../hooks/useClaimBounty";
+import { IS_CONTRACT_DEPLOYED } from "../constants";
 
-// Mock bounty data — replace with `getObjectWithJson(id)` query
-function getMockBounty(id: string) {
-  const map: Record<string, {
-    id: string; target: string; amount: string; asset: string;
-    threat: string; issuer: string; created: string; expiryMs: number;
-  }> = {
-    b1: { id, target: "Kyla Vheren",      amount: "5,000",  asset: "EVE Token", threat: "S", issuer: "7778881", created: "2026-03-15", expiryMs: Date.now() + 48 * 3600000 },
-    b2: { id, target: "Siren's Call",      amount: "1,200",  asset: "LUX",       threat: "B", issuer: "9992224", created: "2026-03-16", expiryMs: Date.now() +  8 * 3600000 },
-    b3: { id, target: "Malfunctioning AI", amount: "10,000", asset: "EVE Token", threat: "S", issuer: "Admin",   created: "2026-03-14", expiryMs: Date.now() + 96 * 3600000 },
-  };
-  return map[id] ?? { id, target: "Unknown Target", amount: "—", asset: "LUX", threat: "D", issuer: "Unknown", created: "—", expiryMs: Date.now() };
-}
+// Mock fallback for dev/preview
+const MOCK_MAP: Record<string, { target: string; amount: string; asset: string; issuer: string; threat: "S" | "A" | "B" | "C" | "D"; expiryMs: number }> = {
+  b1: { target: "Kyla Vheren",      amount: "5,000",  asset: "EVE Token", issuer: "7778881", threat: "S", expiryMs: Date.now() + 48 * 3600000 },
+  b2: { target: "Siren's Call",      amount: "1,200",  asset: "LUX",       issuer: "9992224", threat: "B", expiryMs: Date.now() +  8 * 3600000 },
+  b3: { target: "Malfunctioning AI", amount: "10,000", asset: "EVE Token", issuer: "Admin",   threat: "S", expiryMs: Date.now() + 96 * 3600000 },
+};
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "EXPIRED";
@@ -26,24 +23,65 @@ function formatCountdown(ms: number) {
 
 export function BountyDetailPage({ id }: { id: string }) {
   const account = useCurrentAccount();
-  const bounty  = getMockBounty(id);
 
+  // On-chain fetch — only used for real object IDs (0x...), falls back to mock for short IDs
+  const { bounty: onChainBounty, loading: bountyLoading } = useBountyDetail(id);
+  const { claimBounty, loading: claiming, error: claimError } = useClaimBounty();
+
+  const mock = MOCK_MAP[id];
+  const isOnChain = IS_CONTRACT_DEPLOYED && !!onChainBounty;
+
+  // Display data — prefer on-chain, fallback to mock, fallback to unknown
+  const displayTarget  = isOnChain ? onChainBounty!.targetCharacterId : (mock?.target ?? "Unknown Target");
+  const displayAmount  = isOnChain ? onChainBounty!.rewardAmount       : (mock?.amount ?? "—");
+  const displayAsset   = isOnChain ? onChainBounty!.asset               : (mock?.asset ?? "LUX");
+  const displayIssuer  = isOnChain ? onChainBounty!.issuer              : (mock?.issuer ?? "Unknown");
+  const displayThreat  = isOnChain ? onChainBounty!.threatClass          : (mock?.threat ?? "D");
+  const expiryMs       = isOnChain ? onChainBounty!.expiryTimestampMs   : (mock?.expiryMs ?? Date.now());
+
+  const [countdown, setCountdown] = useState(expiryMs - Date.now());
   const [killmailId, setKillmailId] = useState("");
-  const [settling,   setSettling]   = useState(false);
-  const [settled,    setSettled]    = useState(false);
-  const [error,      setError]      = useState("");
+  const [hunterCharId, setHunterCharId] = useState("");
+  const [settled, setSettled] = useState(false);
 
-  const remaining = bounty.expiryMs - Date.now();
-  const isExpired = remaining <= 0;
+  // Live countdown ticker
+  useEffect(() => {
+    const timer = setInterval(() => setCountdown(expiryMs - Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [expiryMs]);
+
+  const isExpired = countdown <= 0;
 
   async function handleClaim() {
     if (!account || !killmailId) return;
-    setSettling(true);
-    setError("");
-    // TODO: call useClaimBounty hook → buildClaimBountyTx
-    await new Promise((r) => setTimeout(r, 2000));
-    setSettling(false);
-    setSettled(true);
+    if (IS_CONTRACT_DEPLOYED && onChainBounty) {
+      try {
+        await claimBounty({
+          bountyId: id,
+          coinType: onChainBounty.coinType,
+          killmailId,
+          hunterCharacterId: hunterCharId,
+        });
+        setSettled(true);
+      } catch {
+        // claimError will be set by the hook
+      }
+    } else {
+      // Preview mode stub
+      await new Promise((r) => setTimeout(r, 1500));
+      setSettled(true);
+    }
+  }
+
+  if (bountyLoading) {
+    return (
+      <div style={{ paddingTop: "5rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem" }}>
+        <Loader2 size={20} style={{ animation: "spin 1s linear infinite", color: "var(--brand)" }} />
+        <span style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--brand)" }}>
+          Loading Contract…
+        </span>
+      </div>
+    );
   }
 
   return (
@@ -56,25 +94,25 @@ export function BountyDetailPage({ id }: { id: string }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: "2rem" }}>
         {/* ── Left: Details ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-          {/* Title block */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: "1.25rem" }}>
-            <ThreatBadge level={bounty.threat} size="lg" />
+            <ThreatBadge level={displayThreat} size="lg" />
             <div>
               <h1 className="page-title glitch-hover" style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", marginBottom: "0.3rem" }}>
-                {bounty.target}
+                {displayTarget}
               </h1>
-              <p className="mono dim" style={{ fontSize: "0.7rem" }}>Contract ID: {bounty.id}.toUpperCase()…FF</p>
+              <p className="mono dim" style={{ fontSize: "0.7rem" }}>
+                Contract ID: {id.startsWith("0x") ? `${id.slice(0, 14)}…${id.slice(-6)}` : `0x${id.toUpperCase()}…FF`}
+              </p>
             </div>
           </div>
 
-          {/* Stats grid */}
           <div className="industrial-panel">
             <p className="section-label" style={{ marginBottom: "1.25rem" }}>01 // Contract Parameters</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.25rem" }}>
               {[
-                { label: "Reward",   val: `${bounty.amount} ${bounty.asset}` },
-                { label: "Issuer ID", val: bounty.issuer },
-                { label: "Posted",   val: bounty.created },
+                { label: "Reward",    val: `${displayAmount} ${displayAsset}` },
+                { label: "Issuer",    val: displayIssuer.startsWith("0x") ? `${displayIssuer.slice(0, 8)}…` : displayIssuer },
+                { label: "Coin Type", val: displayAsset },
               ].map((s) => (
                 <div key={s.label}>
                   <p className="form-label">{s.label}</p>
@@ -84,12 +122,11 @@ export function BountyDetailPage({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* Countdown */}
           <div className="industrial-panel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <p className="form-label">Contract Expires In</p>
               <p className="mono" style={{ fontSize: "2rem", fontWeight: 700, letterSpacing: "0.05em", color: isExpired ? "var(--gray)" : "var(--brand)" }}>
-                {formatCountdown(remaining)}
+                {formatCountdown(countdown)}
               </p>
             </div>
             {isExpired && (
@@ -105,7 +142,6 @@ export function BountyDetailPage({ id }: { id: string }) {
           <p className="section-label">02 // Action Center</p>
 
           {settled ? (
-            /* Success state */
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", textAlign: "center" }}>
               <CheckCircle2 size={40} style={{ color: "var(--green)" }} />
               <h3 style={{ fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--green)" }}>
@@ -118,11 +154,10 @@ export function BountyDetailPage({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              {/* Info */}
               <div>
                 <p style={{ fontSize: "0.75rem", color: "rgba(250,250,229,0.5)", lineHeight: "1.7", marginBottom: "1rem" }}>
-                  Submit the native <strong>Frontier Killmail Object</strong> ID to claim the reward.
-                  The contract will verify <em>victim_id</em>, <em>killer_id</em>, and kill timestamp on-chain.
+                  Submit the on-chain <strong>Frontier Killmail Object</strong> ID to claim the reward.
+                  The contract verifies <em>victim_id</em>, <em>killer_id</em>, and kill timestamp.
                 </p>
 
                 {isExpired && (
@@ -133,7 +168,7 @@ export function BountyDetailPage({ id }: { id: string }) {
                 )}
               </div>
 
-              {/* Killmail input */}
+              {/* Killmail Object ID */}
               <div>
                 <label className="form-label">Killmail Object ID</label>
                 <input
@@ -141,26 +176,40 @@ export function BountyDetailPage({ id }: { id: string }) {
                   type="text"
                   value={killmailId}
                   onChange={(e) => setKillmailId(e.target.value)}
-                  placeholder="0x... (on-chain Killmail ID)"
+                  placeholder="0x... (on-chain Killmail shared object ID)"
                   disabled={isExpired}
                 />
                 <p style={{ fontSize: "0.6rem", opacity: 0.25, marginTop: "0.3rem" }}>
-                  Find your Killmail ID in EVE Frontier explorer after a confirmed kill.
+                  Find the Killmail ID in your EVE Frontier client after a confirmed kill.
                 </p>
               </div>
 
-              {error && (
-                <p style={{ fontSize: "0.7rem", color: "var(--martian-red)" }}>{error}</p>
+              {/* Hunter Character ID (needed for on-chain verification) */}
+              {IS_CONTRACT_DEPLOYED && (
+                <div>
+                  <label className="form-label">Your Character Object ID</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={hunterCharId}
+                    onChange={(e) => setHunterCharId(e.target.value)}
+                    placeholder="0x... (your Character shared object ID)"
+                    disabled={isExpired}
+                  />
+                </div>
               )}
 
-              {/* Claim button */}
+              {claimError && (
+                <p style={{ fontSize: "0.7rem", color: "var(--martian-red)" }}>{claimError}</p>
+              )}
+
               <button
                 className="eve-btn eve-btn--primary eve-btn--full"
                 onClick={handleClaim}
-                disabled={settling || !account || !killmailId || isExpired}
+                disabled={claiming || !account || !killmailId || isExpired || (IS_CONTRACT_DEPLOYED && !hunterCharId)}
                 style={{ marginTop: "auto" }}
               >
-                {settling ? (
+                {claiming ? (
                   <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Verifying Killmail…</>
                 ) : (
                   "Submit Killmail & Claim"

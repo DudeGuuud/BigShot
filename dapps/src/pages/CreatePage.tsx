@@ -3,12 +3,21 @@ import { Activity, Cpu, ShieldAlert, Target, Zap } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { LoaderBars } from "../components/LoaderBars";
 import { ThreatBadge } from "../components/ThreatBadge";
+import { useCreateBounty } from "../hooks/useCreateBounty";
+import {
+  IS_CONTRACT_DEPLOYED,
+  LUX_COIN_TYPE,
+  EVE_COIN_TYPE,
+  TREASURY_LUX_ID,
+  TREASURY_EVE_ID,
+} from "../constants";
 
 type ThreatClass = "S" | "A" | "B" | "C" | "D";
 
 interface AnalysisResult {
   targetId: string;
   threatClass: ThreatClass;
+  threatLevel: number; // 0=D … 4=S
   riskLevel: string;
   activity: number;
   assetValue: number;
@@ -16,7 +25,7 @@ interface AnalysisResult {
   report: string;
 }
 
-// Rule-based threat calculation (off-chain, deterministic for mockup)
+// Rule-based threat calculation (deterministic, off-chain)
 function calcThreat(targetId: string): AnalysisResult {
   const hash = targetId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const activity   = hash % 100;
@@ -25,15 +34,17 @@ function calcThreat(targetId: string): AnalysisResult {
   const score      = activity * 0.4 + assetValue * 0.00005 * 100 + aggression * 0.1 * 10;
 
   let threatClass: ThreatClass = "D";
+  let threatLevel = 0;
   let riskLevel = "LOW";
-  if      (score > 75) { threatClass = "S"; riskLevel = "CRITICAL"; }
-  else if (score > 55) { threatClass = "A"; riskLevel = "HIGH"; }
-  else if (score > 35) { threatClass = "B"; riskLevel = "ELEVATED"; }
-  else if (score > 15) { threatClass = "C"; riskLevel = "MODERATE"; }
+  if      (score > 75) { threatClass = "S"; threatLevel = 4; riskLevel = "CRITICAL"; }
+  else if (score > 55) { threatClass = "A"; threatLevel = 3; riskLevel = "HIGH"; }
+  else if (score > 35) { threatClass = "B"; threatLevel = 2; riskLevel = "ELEVATED"; }
+  else if (score > 15) { threatClass = "C"; threatLevel = 1; riskLevel = "MODERATE"; }
 
   return {
     targetId,
     threatClass,
+    threatLevel,
     riskLevel,
     activity,
     assetValue,
@@ -59,6 +70,7 @@ RECOMMENDATION:
 
 export function CreatePage() {
   const account = useCurrentAccount();
+  const { createBounty, loading: submitting, error: txError } = useCreateBounty();
 
   const [targetId, setTargetId]   = useState("");
   const [amount,   setAmount]     = useState("");
@@ -66,7 +78,7 @@ export function CreatePage() {
   const [duration, setDuration]   = useState("72"); // hours
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis]   = useState<AnalysisResult | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [txDigest, setTxDigest]   = useState<string | null>(null);
 
   const fee = amount ? (Number(amount) * 0.05).toFixed(2) : "0.00";
 
@@ -82,11 +94,33 @@ export function CreatePage() {
 
   async function handleSubmit() {
     if (!account || !analysis || !amount) return;
-    setSubmitting(true);
-    // TODO: call useCreateBounty hook
-    await new Promise((r) => setTimeout(r, 2000));
-    setSubmitting(false);
-    alert("Transaction signed! (stub — connect contract in Phase 3)");
+
+    if (IS_CONTRACT_DEPLOYED) {
+      const coinType    = asset === "LUX" ? LUX_COIN_TYPE : EVE_COIN_TYPE;
+      const treasuryId  = asset === "LUX" ? TREASURY_LUX_ID : TREASURY_EVE_ID;
+      const durationMs  = BigInt(Number(duration) * 3600 * 1000);
+      // Amount in smallest unit (assuming 6 decimals for LUX; adjust per actual coin)
+      const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000));
+
+      try {
+        const result = await createBounty({
+          treasuryId,
+          coinType,
+          targetCharacterId: targetId,
+          threatLevel: analysis.threatLevel,
+          coinObjectIds: [], // TODO: populate from wallet coin objects via useCurrentAccount
+          paymentAmount: rawAmount,
+          durationMs,
+        });
+        if (result) setTxDigest((result as { digest?: string }).digest ?? "submitted");
+      } catch {
+        // txError will reflect the failure
+      }
+    } else {
+      // Preview mode stub
+      await new Promise((r) => setTimeout(r, 2000));
+      setTxDigest("PREVIEW_MODE — contract not yet deployed");
+    }
   }
 
   return (
@@ -96,9 +130,18 @@ export function CreatePage() {
           Post <span className="dim">Bounty</span>
         </h1>
         <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
-          Stake LUX or EVE Token against a target character. Rewards held in trustless escrow.
+          {IS_CONTRACT_DEPLOYED
+            ? "Stake LUX or EVE Token against a target character. Rewards held in trustless escrow."
+            : "⚠ Preview mode — contract not deployed. Submission is simulated."}
         </p>
       </div>
+
+      {txDigest && (
+        <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.2)", padding: "1rem 1.25rem", marginBottom: "1.5rem", fontSize: "0.75rem", color: "var(--green)" }}>
+          ✓ Bounty published! Tx: <span className="mono">{txDigest}</span>
+          <a href="#/list" style={{ marginLeft: "1rem", color: "var(--brand)", fontWeight: 700 }}>View Board →</a>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
         {/* ── Left: Form ── */}
@@ -109,7 +152,6 @@ export function CreatePage() {
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              {/* Target */}
               <div>
                 <label className="form-label">Target Character ID</label>
                 <input
@@ -117,14 +159,13 @@ export function CreatePage() {
                   type="text"
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
-                  placeholder="Enter target character_id..."
+                  placeholder="Enter target character_id (u64)..."
                 />
                 <p style={{ fontSize: "0.6rem", color: "rgba(250,250,229,0.2)", marginTop: "0.3rem" }}>
                   Obtain from target's PlayerProfile object on-chain.
                 </p>
               </div>
 
-              {/* Asset + Amount */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
                   <label className="form-label">Stake Asset</label>
@@ -145,7 +186,6 @@ export function CreatePage() {
                 </div>
               </div>
 
-              {/* Duration */}
               <div>
                 <label className="form-label">Contract Duration (hours)</label>
                 <input
@@ -157,7 +197,6 @@ export function CreatePage() {
                 />
               </div>
 
-              {/* Fee summary */}
               <div style={{ padding: "0.75rem", background: "rgba(255,71,0,0.04)", border: "1px solid rgba(255,71,0,0.15)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                   <span style={{ opacity: 0.4 }}>Protocol Fee (5%)</span>
@@ -165,7 +204,6 @@ export function CreatePage() {
                 </div>
               </div>
 
-              {/* Analyze */}
               <button
                 className="eve-btn"
                 onClick={startAnalysis}
@@ -213,13 +251,16 @@ export function CreatePage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", opacity: 0.4, marginBottom: "0.6rem" }}>
                     <ShieldAlert size={12} /> Confirmation Required
                   </div>
+                  {txError && (
+                    <p style={{ fontSize: "0.7rem", color: "var(--martian-red)", marginBottom: "0.6rem" }}>{txError}</p>
+                  )}
                   <button
                     className="eve-btn eve-btn--primary eve-btn--full"
                     onClick={handleSubmit}
-                    disabled={!account || submitting || !amount}
+                    disabled={!account || submitting || !amount || !!txDigest}
                   >
                     {submitting ? "Signing…" : (
-                      <><span>Sign &amp; Publish Escrow</span><Zap size={13} /></>
+                      <><span>Sign & Publish Escrow</span><Zap size={13} /></>
                     )}
                   </button>
                   {!account && (
