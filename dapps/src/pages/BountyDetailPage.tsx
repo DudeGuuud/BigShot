@@ -5,18 +5,12 @@ import { ThreatBadge } from "../components/ThreatBadge";
 import { useBountyDetail } from "../hooks/useBountyDetail";
 import { useClaimBounty } from "../hooks/useClaimBounty";
 import { IS_CONTRACT_DEPLOYED } from "../constants";
-
-// Mock fallback for dev/preview
-function formatCountdown(ms: number) {
-  if (ms <= 0) return "EXPIRED";
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+import { formatCountdown } from "utils/formatters";
+import { useBigShot } from "../context/BigShotContext";
 
 export function BountyDetailPage({ id }: { id: string }) {
   const account = useCurrentAccount();
+  const { characterId: savedCharId } = useBigShot();
 
   // On-chain fetch
   const { bounty: onChainBounty, loading: bountyLoading } = useBountyDetail(id);
@@ -54,7 +48,7 @@ export function BountyDetailPage({ id }: { id: string }) {
 
   const [countdown, setCountdown] = useState(expiryMs - Date.now());
   const [killmailId, setKillmailId] = useState("");
-  const [hunterCharId, setHunterCharId] = useState("");
+  const [hunterCharId, setHunterCharId] = useState(savedCharId || "");
   const [settled, setSettled] = useState(false);
 
   // Live countdown ticker
@@ -123,8 +117,8 @@ export function BountyDetailPage({ id }: { id: string }) {
             <p className="section-label" style={{ marginBottom: "1.25rem" }}>01 // Contract Parameters</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.25rem" }}>
               {[
-                { label: "Reward",    val: `${displayAmount} ${displayAsset}` },
-                { label: "Issuer",    val: displayIssuer.startsWith("0x") ? `${displayIssuer.slice(0, 8)}…` : displayIssuer },
+                { label: "Reward", val: `${displayAmount} ${displayAsset}` },
+                { label: "Issuer", val: displayIssuer.startsWith("0x") ? `${displayIssuer.slice(0, 8)}…` : displayIssuer },
                 { label: "Coin Type", val: displayAsset },
               ].map((s) => (
                 <div key={s.label}>

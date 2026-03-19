@@ -2,16 +2,21 @@ import { Link2, User, CheckCircle2, Loader2 } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { useConnection } from "@evefrontier/dapp-kit";
 import { useCharacterId } from "../hooks/useCharacterId";
+import { useBigShot } from "../context/BigShotContext";
 
 export function BindPage() {
   const account = useCurrentAccount();
   const { handleConnect } = useConnection();
 
+  const { setCharacterId: saveCharacterId } = useBigShot();
   const { resolve, characterId, loading, error: resolveError } = useCharacterId();
 
   async function fetchCharacterId() {
     if (!account) return;
-    await resolve(account.address);
+    const cid = await resolve(account.address);
+    if (cid) {
+      saveCharacterId(cid);
+    }
   }
 
   return (
