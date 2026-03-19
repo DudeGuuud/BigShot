@@ -1,46 +1,47 @@
-import { Box, Container, Flex, Heading } from "@radix-ui/themes";
-import { WalletStatus } from "./WalletStatus";
-import { abbreviateAddress, useConnection } from "@evefrontier/dapp-kit";
-import { useCurrentAccount } from "@mysten/dapp-kit-react";
+import { useState, useEffect } from "react";
+import { Header } from "./components/Header";
+import { HomePage } from "./pages/HomePage";
+import { ListPage } from "./pages/ListPage";
+import { CreatePage } from "./pages/CreatePage";
+import { BountyDetailPage } from "./pages/BountyDetailPage";
+import { BindPage } from "./pages/BindPage";
+
+// Minimal hash-based router — no third-party lib needed
+function getRoute() {
+  const hash = window.location.hash.replace("#", "") || "/";
+  return hash;
+}
 
 function App() {
-  /**
-   * STEP 2 — Wallet connection
-   *
-   * useConnection() (@evefrontier/dapp-kit) → handleConnect, handleDisconnect;
-   * isConnected, walletAddress, hasEveVault. useCurrentAccount()
-   * (@mysten/dapp-kit-react) → account (e.g. account.address) for UI. abbreviateAddress()
-   * (@evefrontier/dapp-kit) for display.
-   */
-  const { handleConnect, handleDisconnect } = useConnection();
-  const account = useCurrentAccount();
+  const [route, setRoute] = useState(getRoute());
+
+  useEffect(() => {
+    const onHashChange = () => setRoute(getRoute());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  let page: React.ReactNode;
+  if (route === "/" || route === "") {
+    page = <HomePage />;
+  } else if (route === "/list") {
+    page = <ListPage />;
+  } else if (route === "/create") {
+    page = <CreatePage />;
+  } else if (route === "/bind") {
+    page = <BindPage />;
+  } else if (route.startsWith("/bounty/")) {
+    const id = route.replace("/bounty/", "");
+    page = <BountyDetailPage id={id} />;
+  } else {
+    page = <HomePage />;
+  }
 
   return (
-    <Box style={{ padding: "20px" }}>
-      <Flex
-        position="sticky"
-        px="4"
-        py="2"
-        direction="row"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <Heading>EVE Frontier dApp Starter Template</Heading>
-
-        {/* STEP 2 — Connect/disconnect; show abbreviated address in header. */}
-        <button
-          onClick={() =>
-            account?.address ? handleDisconnect() : handleConnect()
-          }
-        >
-          {account ? abbreviateAddress(account?.address) : "Connect Wallet"}
-        </button>
-      </Flex>
-      {/* STEP 3 — Same hooks (useConnection, useCurrentAccount) drive WalletStatus; state stays in sync. */}
-      <WalletStatus />
-    </Box>
+    <div className="app-shell">
+      <Header />
+      <main className="page-content">{page}</main>
+    </div>
   );
 }
 

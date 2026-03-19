@@ -1,0 +1,317 @@
+/* ============================================
+   BigShot — Global Industrial CSS
+   EVE Frontier Aesthetic: Dark / CRT / Glitch
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Roboto+Mono:wght@400;500;700&family=Orbitron:wght@700;900&display=swap');
+
+/* === Reset === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* === Tokens === */
+:root {
+  --eve-black:   #050505;
+  --eve-dark:    #0d0d0d;
+  --eve-panel:   rgba(17, 17, 17, 0.95);
+  --eve-border:  rgba(250, 250, 229, 0.08);
+  --eve-cream:   #fafae5;
+  --brand:       #ff4700;
+  --martian-red: #ff2a2a;
+  --amber:       #ff9100;
+  --gold:        #ffd700;
+  --cyan:        #00e5ff;
+  --gray:        #a0a0a0;
+  --green:       #22c55e;
+  --font-mono:   'Roboto Mono', ui-monospace, monospace;
+  --font-title:  'Orbitron', sans-serif;
+  --font-body:   'Inter', system-ui, sans-serif;
+}
+
+/* === Base === */
+html, body {
+  background-color: var(--eve-black);
+  color: var(--eve-cream);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Global CRT Scanline Overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.1) 50%),
+    linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.01), rgba(0,0,255,0.02));
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.25;
+}
+
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: inherit; }
+
+/* === Layout === */
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-content {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 4rem;
+}
+
+/* === Header === */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(5,5,5,0.92);
+  border-bottom: 1px solid var(--eve-border);
+  backdrop-filter: blur(12px);
+  padding: 0 2rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.site-logo {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--brand);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.nav-link {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(250,250,229,0.4);
+  transition: color 0.2s;
+}
+.nav-link:hover, .nav-link.active { color: var(--brand); }
+
+/* === Typography === */
+.page-title {
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  color: var(--eve-cream);
+}
+
+.page-title .dim { color: rgba(250,250,229,0.15); }
+
+.section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* === Industrial Panel === */
+.industrial-panel {
+  background: var(--eve-panel);
+  border: 1px solid var(--eve-border);
+  padding: 1.5rem;
+  position: relative;
+}
+.industrial-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: -1px;
+  width: 10px; height: 10px;
+  border-left: 2px solid var(--brand);
+  border-top: 2px solid var(--brand);
+  pointer-events: none;
+}
+
+/* === Buttons === */
+.eve-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--brand);
+  color: var(--brand);
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.18s;
+}
+.eve-btn:hover { background: var(--brand); color: #000; }
+.eve-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.eve-btn--primary { background: var(--brand); color: #000; }
+.eve-btn--primary:hover { background: #e53d00; }
+.eve-btn--danger { border-color: var(--martian-red); color: var(--martian-red); }
+.eve-btn--danger:hover { background: var(--martian-red); color: #fff; }
+.eve-btn--full { width: 100%; justify-content: center; }
+
+/* === Form elements === */
+.form-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(250,250,229,0.3);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--eve-black);
+  border: 1px solid var(--eve-border);
+  color: var(--eve-cream);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+  appearance: none;
+}
+.form-input:focus, .form-select:focus { border-color: rgba(255,71,0,0.4); }
+.form-input::placeholder { color: rgba(250,250,229,0.15); }
+
+/* === Threat badges === */
+.threat-badge {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: #000;
+  flex-shrink: 0;
+}
+.threat-S { background: var(--martian-red); box-shadow: 0 0 12px rgba(255,42,42,0.5); }
+.threat-A { background: var(--amber); }
+.threat-B { background: var(--gold); }
+.threat-C { background: var(--cyan); }
+.threat-D { background: var(--gray); }
+
+/* Larger variant for detail pages */
+.threat-badge-lg {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.4rem;
+}
+
+/* === Status pill === */
+.status-active { color: var(--green); }
+.status-claimed { color: rgba(250,250,229,0.2); }
+.status-expired { color: var(--gray); }
+
+/* === Table === */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table thead tr {
+  border-bottom: 1px solid var(--eve-border);
+}
+.data-table th {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: rgba(250,250,229,0.25);
+  padding: 0.75rem 1.25rem;
+  text-align: left;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid rgba(250,250,229,0.04);
+  transition: background 0.15s;
+}
+.data-table tbody tr:hover { background: rgba(255,71,0,0.025); }
+.data-table td { padding: 1rem 1.25rem; vertical-align: middle; }
+
+/* === Animations === */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fadeInUp 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+.pulse { animation: pulse-glow 1.5s ease-in-out infinite; }
+
+@keyframes glitch {
+  0%   { clip-path: inset(40% 0 61% 0); transform: translate(-2px,-2px); }
+  20%  { clip-path: inset(92% 0  1% 0); transform: translate(1px, 2px); }
+  40%  { clip-path: inset(43% 0  1% 0); transform: translate(-1px,-2px); }
+  60%  { clip-path: inset(25% 0 58% 0); transform: translate(2px, 1px); }
+  80%  { clip-path: inset(54% 0  7% 0); transform: translate(-2px, 2px); }
+  100% { clip-path: inset(58% 0 43% 0); transform: translate(1px,-2px); }
+}
+.glitch-hover:hover { animation: glitch 0.3s infinite; text-shadow: 2px 0 var(--martian-red), -2px 0 var(--cyan); }
+
+/* === Scanline panel effect === */
+.scanline-panel { position: relative; overflow: hidden; }
+.scanline-panel::after {
+  content: "";
+  position: absolute;
+  top: -2px; left: 0;
+  width: 100%; height: 2px;
+  background: rgba(255,71,0,0.08);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+}
+@keyframes scanline { 0% { top: -2px; } 100% { top: 100%; } }
+
+/* === Utilities === */
+.mono { font-family: var(--font-mono); }
+.dim  { opacity: 0.3; }
+.tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid;
+}
+.tag-brand { border-color: rgba(255,71,0,.3); color: var(--brand); background: rgba(255,71,0,.05); }
+.tag-red   { border-color: rgba(255,42,42,.3); color: var(--martian-red); background: rgba(255,42,42,.05); }
+
+/* === Loader bars === */
+.loader-bars { display: flex; gap: 3px; align-items: flex-end; }
+.loader-bars span {
+  width: 5px;
+  height: 24px;
+  background: var(--brand);
+  display: block;
+}
+.loader-bars span:nth-child(1) { animation: pulse-glow 1s 0ms   infinite; }
+.loader-bars span:nth-child(2) { animation: pulse-glow 1s 150ms infinite; }
+.loader-bars span:nth-child(3) { animation: pulse-glow 1s 300ms infinite; }
+.loader-bars span:nth-child(4) { animation: pulse-glow 1s 450ms infinite; }
