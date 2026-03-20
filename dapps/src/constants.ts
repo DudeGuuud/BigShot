@@ -28,6 +28,8 @@ export const TREASURY_LUX_ID: string = import.meta.env.VITE_TREASURY_LUX_ID;
 
 export const TREASURY_EVE_ID: string = import.meta.env.VITE_TREASURY_EVE_ID;
 
+export const KILLMAIL_REGISTRY_ID: string = import.meta.env.VITE_KILLMAIL_REGISTRY_ID;
+
 // ─── Sui system constants ─────────────────────────────────────────────────────
 export const SUI_CLOCK_OBJECT_ID = "0x0000000000000000000000000000000000000000000000000000000000000006";
 

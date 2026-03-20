@@ -31,8 +31,7 @@ function App() {
   } else if (route === "/bind") {
     page = <BindPage />;
   } else if (route.startsWith("/bounty/")) {
-    const id = route.replace("/bounty/", "");
-    page = <BountyDetailPage id={id} />;
+    page = <BountyDetailPage />;
   } else {
     page = <HomePage />;
   }

@@ -1,22 +1,72 @@
+
 import { useState, useEffect } from "react";
-import { ArrowLeft, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, MapPin, Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { ThreatBadge } from "../components/ThreatBadge";
 import { useBountyDetail } from "../hooks/useBountyDetail";
 import { useClaimBounty } from "../hooks/useClaimBounty";
+import { useLastSeen } from "../hooks/useLastSeen";
+import { TacticalTimelineModal } from "../components/TacticalTimelineModal";
 import { IS_CONTRACT_DEPLOYED } from "../constants";
-import { formatCountdown } from "../utils/formatters";
+import { formatCountdown, formatAddress } from "../utils/formatters";
 import { useBigShot } from "../context/BigShotContext";
 
-export function BountyDetailPage({ id }: { id: string }) {
+export function BountyDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const account = useCurrentAccount();
-  const { characterId: savedCharId } = useBigShot();
+  const { characterId } = useBigShot();
 
   // On-chain fetch
-  const { bounty: onChainBounty, loading: bountyLoading } = useBountyDetail(id);
+  const { bounty, loading: detailLoading } = useBountyDetail(id || "");
   const { claimBounty, loading: claiming, error: claimError } = useClaimBounty();
 
-  if (bountyLoading) {
+  // Fetch Last Seen info if we have the target's ID
+  const { lastSeen, loading: lastSeenLoading } = useLastSeen(bounty?.targetCharacterId || "");
+
+  const [countdown, setCountdown] = useState(0); // Initialized to 0, will be set by useEffect
+  const [killmailId, setKillmailId] = useState("");
+  const [hunterCharacterId, setHunterCharacterId] = useState(characterId || "");
+  const [settled, setSettled] = useState(false);
+
+  // Set countdown once bounty data is available
+  useEffect(() => {
+    if (bounty?.expiryTimestampMs) {
+      setCountdown(bounty.expiryTimestampMs - Date.now());
+    }
+  }, [bounty?.expiryTimestampMs]);
+
+  // Live countdown ticker
+  useEffect(() => {
+    if (!bounty?.expiryTimestampMs) return;
+    const timer = setInterval(() => setCountdown(bounty.expiryTimestampMs - Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [bounty?.expiryTimestampMs]);
+
+  const isExpired = countdown <= 0;
+
+  async function handleClaim() {
+    if (!account || !killmailId) return;
+    if (IS_CONTRACT_DEPLOYED && bounty) {
+      try {
+        await claimBounty({
+          bountyId: id || "",
+          coinType: bounty.coinType,
+          killmailId,
+          hunterCharacterId: hunterCharacterId,
+        });
+        setSettled(true);
+      } catch {
+        // claimError will be set by the hook
+      }
+    } else {
+      // Preview mode stub
+      await new Promise((r) => setTimeout(r, 1500));
+      setSettled(true);
+    }
+  }
+
+  if (detailLoading) {
     return (
       <div style={{ paddingTop: "5rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem" }}>
         <Loader2 size={20} style={{ animation: "spin 1s linear infinite", color: "var(--brand)" }} />
@@ -27,7 +77,7 @@ export function BountyDetailPage({ id }: { id: string }) {
     );
   }
 
-  if (!onChainBounty) {
+  if (!bounty) {
     return (
       <div style={{ paddingTop: "5rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem" }}>
         <AlertTriangle size={40} style={{ color: "var(--amber)" }} />
@@ -43,53 +93,8 @@ export function BountyDetailPage({ id }: { id: string }) {
     asset: displayAsset,
     issuer: displayIssuer,
     threatClass: displayThreat,
-    expiryTimestampMs: expiryMs,
-  } = onChainBounty;
+  } = bounty;
 
-  const [countdown, setCountdown] = useState(expiryMs - Date.now());
-  const [killmailId, setKillmailId] = useState("");
-  const [hunterCharId, setHunterCharId] = useState(savedCharId || "");
-  const [settled, setSettled] = useState(false);
-
-  // Live countdown ticker
-  useEffect(() => {
-    const timer = setInterval(() => setCountdown(expiryMs - Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [expiryMs]);
-
-  const isExpired = countdown <= 0;
-
-  async function handleClaim() {
-    if (!account || !killmailId) return;
-    if (IS_CONTRACT_DEPLOYED && onChainBounty) {
-      try {
-        await claimBounty({
-          bountyId: id,
-          coinType: onChainBounty.coinType,
-          killmailId,
-          hunterCharacterId: hunterCharId,
-        });
-        setSettled(true);
-      } catch {
-        // claimError will be set by the hook
-      }
-    } else {
-      // Preview mode stub
-      await new Promise((r) => setTimeout(r, 1500));
-      setSettled(true);
-    }
-  }
-
-  if (bountyLoading) {
-    return (
-      <div style={{ paddingTop: "5rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem" }}>
-        <Loader2 size={20} style={{ animation: "spin 1s linear infinite", color: "var(--brand)" }} />
-        <span style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--brand)" }}>
-          Loading Contract…
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div style={{ paddingTop: "3rem" }}>
@@ -108,8 +113,38 @@ export function BountyDetailPage({ id }: { id: string }) {
                 {displayTarget}
               </h1>
               <p className="mono dim" style={{ fontSize: "0.7rem" }}>
-                Contract ID: {id.startsWith("0x") ? `${id.slice(0, 14)}…${id.slice(-6)}` : `0x${id.toUpperCase()}…FF`}
+                Contract ID: {id?.startsWith("0x") ? id.slice(0, 14) + "…" + id.slice(-6) : "0x" + id?.toUpperCase() + "…FF"}
               </p>
+            </div>
+          </div>
+
+          <p className="dim" style={{ fontSize: "0.85rem", margin: "1rem 0" }}>
+            This individual has been marked for termination by <span className="mono">{formatAddress(bounty.issuer)}</span>. Any licensed pod pilot who provides verifiable proof of termination inside a Frontier node is eligible to claim the reward pool.
+          </p>
+
+          {/* Tactical Intelligence: Last Seen */}
+          <div style={{ marginTop: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <h3 style={{ fontSize: "0.8rem", color: "var(--brand)", textTransform: "uppercase", letterSpacing: "0.15em", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
+                <MapPin size={14} /> TACTICAL INTELLIGENCE
+              </h3>
+              <TacticalTimelineModal targetCharacterId={bounty.targetCharacterId} targetName={displayTarget} />
+            </div>
+            <div style={{ background: "rgba(250,250,229,0.03)", border: "1px solid var(--eve-border)", padding: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <span className="dim" style={{ fontSize: "0.7rem", textTransform: "uppercase" }}>Last Known Area</span>
+                  <div style={{ fontWeight: 700, fontSize: "0.95rem", marginTop: "0.2rem", color: lastSeen ? "var(--brand)" : "var(--eve-text)" }}>
+                    {lastSeenLoading ? "SCANNING..." : (lastSeen ? lastSeen.solarSystemId : "UNKNOWN DEEP SPACE")}
+                  </div>
+                </div>
+                <div>
+                  <span className="dim" style={{ fontSize: "0.7rem", textTransform: "uppercase" }}>Signal Age</span>
+                  <div style={{ fontWeight: 700, fontSize: "0.95rem", marginTop: "0.2rem", color: lastSeen ? "var(--eve-text)" : "var(--eve-text)" }}>
+                    {lastSeenLoading ? "..." : (lastSeen ? Math.floor((Date.now() - lastSeen.timestamp) / 60000) + " MINS AGO" : "N/A")}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -117,8 +152,8 @@ export function BountyDetailPage({ id }: { id: string }) {
             <p className="section-label" style={{ marginBottom: "1.25rem" }}>01 // Contract Parameters</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1.25rem" }}>
               {[
-                { label: "Reward", val: `${displayAmount} ${displayAsset}` },
-                { label: "Issuer", val: displayIssuer.startsWith("0x") ? `${displayIssuer.slice(0, 8)}…` : displayIssuer },
+                { label: "Reward", val: displayAmount + " " + displayAsset },
+                { label: "Issuer", val: displayIssuer.startsWith("0x") ? displayIssuer.slice(0, 8) + "…" : displayIssuer },
                 { label: "Coin Type", val: displayAsset },
               ].map((s) => (
                 <div key={s.label}>
@@ -198,8 +233,8 @@ export function BountyDetailPage({ id }: { id: string }) {
                   <input
                     className="form-input"
                     type="text"
-                    value={hunterCharId}
-                    onChange={(e) => setHunterCharId(e.target.value)}
+                    value={hunterCharacterId}
+                    onChange={(e) => setHunterCharacterId(e.target.value)}
                     placeholder="0x... (your Character shared object ID)"
                     disabled={isExpired}
                   />
@@ -213,7 +248,7 @@ export function BountyDetailPage({ id }: { id: string }) {
               <button
                 className="eve-btn eve-btn--primary eve-btn--full"
                 onClick={handleClaim}
-                disabled={claiming || !account || !killmailId || isExpired || (IS_CONTRACT_DEPLOYED && !hunterCharId)}
+                disabled={claiming || !account || !killmailId || isExpired || (IS_CONTRACT_DEPLOYED && !hunterCharacterId)}
                 style={{ marginTop: "auto" }}
               >
                 {claiming ? (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Filter, ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
 import { ThreatBadge } from "../components/ThreatBadge";
+import { TacticalTimelineModal } from "../components/TacticalTimelineModal";
 import { useBounties } from "../hooks/useBounties";
 
 export function ListPage() {
@@ -71,12 +72,13 @@ export function ListPage() {
                   <th>Reward</th>
                   <th>Issuer</th>
                   <th style={{ textAlign: "right" }}>Status</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "3rem", opacity: 0.3, fontSize: "0.8rem" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "3rem", opacity: 0.3, fontSize: "0.8rem" }}>
                       No active contracts found.
                     </td>
                   </tr>
@@ -112,6 +114,9 @@ export function ListPage() {
                         <span className={`status-${status.toLowerCase()}`} style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>
                           {status}
                         </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <TacticalTimelineModal targetCharacterId={b.targetCharacterId} />
                       </td>
                     </tr>
                   );
