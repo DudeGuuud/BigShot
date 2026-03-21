@@ -13,6 +13,7 @@ use sui::coin::{Self, Coin};
 use sui::dynamic_field as df;
 use world::character::Character;
 use world::killmail::Killmail;
+use world::in_game_id;
 
 // === Errors ===
 #[error(code = 0)]
@@ -166,13 +167,13 @@ public fun claim_bounty<T>(
 
     // 3. Verify victim matches target.
     assert!(
-        killmail.victim_id().item_id() == bounty.target_character_id,
+        in_game_id::item_id(&killmail.victim_id()) == bounty.target_character_id,
         EVictimMismatch,
     );
 
     // 4. Verify the hunter is the killer.
     assert!(
-        killmail.killer_id().item_id() == hunter_character.character_id(),
+        in_game_id::item_id(&killmail.killer_id()) == in_game_id::item_id(&hunter_character.key()),
         EKillerMismatch,
     );
 

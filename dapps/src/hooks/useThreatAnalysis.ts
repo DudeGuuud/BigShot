@@ -4,6 +4,7 @@ import { EVE_COIN_TYPE, KILLMAIL_REGISTRY_ID } from "../constants";
 
 export interface TacticalReport {
   targetId: string;
+  characterIdU64: string;
   walletAddress: string;
   pilotName: string;
   tribeId: number;
@@ -34,17 +35,32 @@ export function useThreatAnalysis() {
       const charObj = charResult?.data?.object?.asMoveObject;
       const json = charObj?.contents?.json as any;
 
-      if (!json || !json.character_address) {
+      if (!json || (!json.character_address && !json.character_id)) {
         throw new Error("Target Character ID not found or invalid on-chain.");
       }
 
-      const walletAddress = json.character_address;
-      const tribeId = Number(json.tribe_id || 0);
+      // If they passed PlayerProfile, fetch Character
+      let charJsonToUse = json;
+      if (json.character_id && !json.character_address) {
+        const cRes = await getObjectWithJson(json.character_id);
+        charJsonToUse = cRes?.data?.object?.asMoveObject?.contents?.json as any || json;
+      }
+
+      const walletAddress = charJsonToUse.character_address || "UNKNOWN";
+      const tribeId = Number(charJsonToUse.tribe_id || 0);
+
+      // Extract U64 from TenantItemId
+      let charU64 = "0";
+      if (charJsonToUse.key?.item_id) {
+         charU64 = String(charJsonToUse.key.item_id);
+      } else if (charJsonToUse.key?.fields?.item_id) {
+         charU64 = String(charJsonToUse.key.fields.item_id);
+      }
 
       // Extract Pilot Name from Metadata Option
       let pilotName = "UNKNOWN ALIAS";
-      if (json.metadata) {
-        const m = Array.isArray(json.metadata) ? json.metadata[0] : json.metadata;
+      if (charJsonToUse.metadata) {
+        const m = Array.isArray(charJsonToUse.metadata) ? charJsonToUse.metadata[0] : charJsonToUse.metadata;
         if (m) {
            pilotName = m.fields?.name || m.name || "UNKNOWN ALIAS";
         }
@@ -202,6 +218,7 @@ ${threatClass === "S" || threatClass === "A" ? "🎯 HIGH VALUE TARGET. Recommen
 
       const finalReportObj: TacticalReport = {
         targetId: targetCharacterId,
+        characterIdU64: charU64,
         walletAddress,
         pilotName,
         tribeId,

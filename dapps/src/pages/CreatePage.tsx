@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Crosshair, Target, AlertTriangle, Coins, Zap } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { LoaderBars } from "../components/LoaderBars";
@@ -6,10 +6,10 @@ import { ThreatBadge } from "../components/ThreatBadge";
 import { useCreateBounty } from "../hooks/useCreateBounty";
 import { useThreatAnalysis } from "../hooks/useThreatAnalysis";
 import {
-  LUX_COIN_TYPE,
   EVE_COIN_TYPE,
-  TREASURY_LUX_ID,
+  SUI_COIN_TYPE,
   TREASURY_EVE_ID,
+  TREASURY_SUI_ID,
 } from "../constants";
 
 // Rule-based threat calculation// Removed mockup calcThreat
@@ -21,11 +21,41 @@ export function CreatePage() {
 
   const [targetId, setTargetId]   = useState("");
   const [amount,   setAmount]     = useState("");
-  const [asset,    setAsset]      = useState("LUX");
+  const [asset,    setAsset]      = useState("EVE");
   const [duration, setDuration]   = useState("72"); // hours
   const [txDigest, setTxDigest]   = useState<string | null>(null);
+  const [balance,  setBalance]    = useState("0.00");
 
   const fee = amount ? (Number(amount) * 0.05).toFixed(2) : "0.00";
+  const selectedCoinType = asset === "EVE" ? EVE_COIN_TYPE : SUI_COIN_TYPE;
+
+  // Fetch balance dynamically when asset or account changes
+  useEffect(() => {
+    if (!account?.address) {
+      setBalance("0.00");
+      return;
+    }
+    fetch("https://fullnode.testnet.sui.io:443", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "suix_getBalance",
+        params: [account.address, selectedCoinType]
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+       if (data?.result?.totalBalance) {
+          const val = Number(data.result.totalBalance) / 1_000_000_000;
+          setBalance(val.toLocaleString(undefined, { maximumFractionDigits: 2 }));
+       } else {
+          setBalance("0.00");
+       }
+    })
+    .catch(() => setBalance("0.00"));
+  }, [account?.address, selectedCoinType]);
 
   async function startAnalysis() {
     if (!targetId) return;
@@ -35,11 +65,11 @@ export function CreatePage() {
   async function handleSubmit() {
     if (!account || !analysis || !amount) return;
 
-    const coinType    = asset === "LUX" ? LUX_COIN_TYPE : EVE_COIN_TYPE;
-    const treasuryId  = asset === "LUX" ? TREASURY_LUX_ID : TREASURY_EVE_ID;
+    const coinType    = selectedCoinType;
+    const treasuryId  = asset === "EVE" ? TREASURY_EVE_ID : TREASURY_SUI_ID;
     const durationMs  = BigInt(Number(duration) * 3600 * 1000);
-    // Amount in smallest unit (assuming 6 decimals for LUX; adjust per actual coin)
-    const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000));
+    // Amount in smallest unit (Assuming EVE/SUI have 9 decimals)
+    const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000_000));
 
     // A to 3, S to 4, etc. Currently the backend uses 0-4
     const threatLevelMapping: Record<string, number> = { "D": 0, "C": 1, "B": 2, "A": 3, "S": 4 };
@@ -49,7 +79,7 @@ export function CreatePage() {
       const res = await createBounty({
         treasuryId,
         coinType,
-        targetCharacterId: targetId,
+        targetCharacterId: analysis.characterIdU64,
         threatLevel: threatLevelNumber,
         paymentAmount: rawAmount,
         durationMs,
@@ -67,7 +97,7 @@ export function CreatePage() {
           Post <span className="dim">Bounty</span>
         </h1>
         <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
-          Stake LUX or EVE Token against a target character. Rewards held in trustless escrow.
+          Stake EVE Token or native SUI against a target character. Rewards held in trustless escrow.
         </p>
       </div>
 
@@ -94,19 +124,26 @@ export function CreatePage() {
                   type="text"
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
-                  placeholder="Enter target character_id (u64)..."
+                  placeholder="Enter Character or PlayerProfile Object ID (0x...)"
                 />
                 <p style={{ fontSize: "0.6rem", color: "rgba(250,250,229,0.2)", marginTop: "0.3rem" }}>
-                  Obtain from target's PlayerProfile object on-chain.
+                  Intelsys will automatically parse the 64-bit target vector.
                 </p>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div>
-                  <label className="form-label">Stake Asset</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <label className="form-label" style={{ margin: 0 }}>Stake Asset</label>
+                    {account && (
+                      <span className="form-label" style={{ margin: 0, color: "var(--brand)" }}>
+                        BAL: {balance}
+                      </span>
+                    )}
+                  </div>
                   <select className="form-select" value={asset} onChange={(e) => setAsset(e.target.value)}>
-                    <option value="LUX">LUX (CREDIT)</option>
                     <option value="EVE">EVE TOKEN</option>
+                    <option value="SUI">SUI NATIVE</option>
                   </select>
                 </div>
                 <div>

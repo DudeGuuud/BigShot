@@ -3,8 +3,8 @@ import { getObjectsByType } from "@evefrontier/dapp-kit";
 import {
   BIGSHOT_PACKAGE_ID,
   IS_CONTRACT_DEPLOYED,
-  LUX_COIN_TYPE,
   EVE_COIN_TYPE,
+  SUI_COIN_TYPE,
 } from "../constants";
 
 export interface OnChainBounty {
@@ -13,7 +13,7 @@ export interface OnChainBounty {
   targetCharacterId: string;
   rewardAmount: string;
   coinType: string;
-  asset: "LUX" | "EVE";
+  asset: "SUI" | "EVE";
   expiryTimestampMs: number;
   threatLevel: number;
   threatClass: "S" | "A" | "B" | "C" | "D";
@@ -39,7 +39,7 @@ function parseBounty(id: string, json: any, coinType: string): OnChainBounty {
     targetCharacterId: String(json?.target_character_id ?? ""),
     rewardAmount: rewardRaw.toLocaleString(),
     coinType,
-    asset: coinType.includes("lux") ? "LUX" : "EVE",
+    asset: coinType.includes("sui") ? "SUI" : "EVE",
     expiryTimestampMs: expiryMs,
     threatLevel: level,
     threatClass: THREAT_MAP[level] ?? "D",
@@ -48,7 +48,7 @@ function parseBounty(id: string, json: any, coinType: string): OnChainBounty {
 }
 
 /**
- * Fetches all active Bounty objects of both LUX and EVE coin types from the chain.
+ * Fetches all active Bounty objects of both SUI and EVE coin types from the chain.
  * Falls back to an empty array if the contract is not yet deployed.
  */
 export function useBounties() {
@@ -66,25 +66,25 @@ export function useBounties() {
       setLoading(true);
       setError(null);
       try {
-        const luxType = `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${LUX_COIN_TYPE}>`;
         const eveType = `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${EVE_COIN_TYPE}>`;
+        const suiType = `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${SUI_COIN_TYPE}>`;
 
-        const [luxResult, eveResult] = await Promise.all([
-          getObjectsByType(luxType),
+        const [eveResult, suiResult] = await Promise.all([
           getObjectsByType(eveType),
+          getObjectsByType(suiType),
         ]);
 
-        const luxNodes = luxResult.data?.objects?.nodes ?? [];
         const eveNodes = eveResult.data?.objects?.nodes ?? [];
+        const suiNodes = suiResult.data?.objects?.nodes ?? [];
 
         const parsed: OnChainBounty[] = [
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...luxNodes.map((n: any) =>
-            parseBounty(n.address, n.asMoveObject?.contents?.json, LUX_COIN_TYPE)
-          ),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...eveNodes.map((n: any) =>
             parseBounty(n.address, n.asMoveObject?.contents?.json, EVE_COIN_TYPE)
+          ),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...suiNodes.map((n: any) =>
+            parseBounty(n.address, n.asMoveObject?.contents?.json, SUI_COIN_TYPE)
           ),
         ];
 

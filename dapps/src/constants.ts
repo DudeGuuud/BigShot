@@ -12,6 +12,9 @@ export const LUX_COIN_TYPE = `${WORLD_PACKAGE_ID}::lux::LUX`;
 
 export const EVE_COIN_TYPE: string = import.meta.env.VITE_EVE_TOKEN_TYPE;
 
+// SUI native coin type
+export const SUI_COIN_TYPE = "0x2::sui::SUI";
+
 // PlayerProfile object type — used to look up character_id from wallet address
 export const PLAYER_PROFILE_TYPE = `${WORLD_PACKAGE_ID}::character::PlayerProfile`;
 
@@ -26,6 +29,8 @@ export const EXTENSION_CONFIG_ID: string = import.meta.env.VITE_EXTENSION_CONFIG
 export const TREASURY_LUX_ID: string = import.meta.env.VITE_TREASURY_LUX_ID;
 
 export const TREASURY_EVE_ID: string = import.meta.env.VITE_TREASURY_EVE_ID;
+
+export const TREASURY_SUI_ID: string = import.meta.env.VITE_TREASURY_SUI_ID;
 
 export const KILLMAIL_REGISTRY_ID: string = import.meta.env.VITE_KILLMAIL_REGISTRY_ID;
 

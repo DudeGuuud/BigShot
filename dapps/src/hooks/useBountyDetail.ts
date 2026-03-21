@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getObjectWithJson } from "@evefrontier/dapp-kit";
-import { LUX_COIN_TYPE, EVE_COIN_TYPE } from "../constants";
+import { SUI_COIN_TYPE, EVE_COIN_TYPE } from "../constants";
 import { OnChainBounty } from "./useBounties";
 
 const THREAT_MAP: Record<number, "S" | "A" | "B" | "C" | "D"> = {
@@ -35,8 +35,8 @@ export function useBountyDetail(objectId: string) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const json = obj.contents?.json as any;
         const typeRepr = (obj.contents?.type as any)?.repr ?? "";
-        const isLux = typeRepr.includes("lux");
-        const coinType = isLux ? LUX_COIN_TYPE : EVE_COIN_TYPE;
+        const isSui = typeRepr.includes("sui");
+        const coinType = isSui ? SUI_COIN_TYPE : EVE_COIN_TYPE;
 
         const level = Number(json?.threat_level ?? 0);
         const expiryMs = Number(json?.expiry_timestamp_ms ?? 0);
@@ -48,7 +48,7 @@ export function useBountyDetail(objectId: string) {
           targetCharacterId: String(json?.target_character_id ?? ""),
           rewardAmount: rewardRaw.toLocaleString(),
           coinType,
-          asset: isLux ? "LUX" : "EVE",
+          asset: isSui ? "SUI" : "EVE",
           expiryTimestampMs: expiryMs,
           threatLevel: level,
           threatClass: THREAT_MAP[level] ?? "D",

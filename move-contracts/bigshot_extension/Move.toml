@@ -4,11 +4,7 @@ edition = "2024"
 # authors = ["BigShot Team"]
 
 [dependencies]
-# Stable tag — pin to avoid breaking changes from main
-world = { git = "https://github.com/evefrontier/world-contracts.git", subdir = "contracts/world", rev = "v0.0.18" }
-
-[addresses]
-bigshot_extension = "0x0"
+world = { local = "../../../builder-scaffold/world-contracts/contracts/world" }
 
 [environments]
 testnet_internal = "4c78adac"

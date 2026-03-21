@@ -29,18 +29,24 @@ export interface CreateBountyParams {
 export function buildCreateBountyTx(params: CreateBountyParams): Transaction {
   const tx = new Transaction();
 
-  // Merge all coin objects if there are multiple, then split for payment
-  let primaryCoin;
-  if (params.coinObjectIds.length === 1) {
-    primaryCoin = tx.object(params.coinObjectIds[0]);
+  let paymentCoin;
+  if (params.coinType === "0x2::sui::SUI") {
+    // For native SUI stakes, strictly use tx.gas to prevent CoinIsGasCoin merge collisions
+    [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(params.paymentAmount)]);
   } else {
-    primaryCoin = tx.object(params.coinObjectIds[0]);
-    tx.mergeCoins(
-      primaryCoin,
-      params.coinObjectIds.slice(1).map((id) => tx.object(id)),
-    );
+    // Merge all coin objects if there are multiple, then split for payment
+    let primaryCoin;
+    if (params.coinObjectIds.length === 1) {
+      primaryCoin = tx.object(params.coinObjectIds[0]);
+    } else {
+      primaryCoin = tx.object(params.coinObjectIds[0]);
+      tx.mergeCoins(
+        primaryCoin,
+        params.coinObjectIds.slice(1).map((id) => tx.object(id)),
+      );
+    }
+    [paymentCoin] = tx.splitCoins(primaryCoin, [tx.pure.u64(params.paymentAmount)]);
   }
-  const [paymentCoin] = tx.splitCoins(primaryCoin, [tx.pure.u64(params.paymentAmount)]);
 
   tx.moveCall({
     target: `${BIGSHOT_PACKAGE_ID}::bigshot::create_bounty`,

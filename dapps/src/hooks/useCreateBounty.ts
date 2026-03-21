@@ -24,18 +24,21 @@ export function useCreateBounty() {
     setError(null);
     setTxDigest(null);
     try {
-      // 1. Fetch coins of the required type using GraphQL
-      const fullCoinType = `0x2::coin::Coin<${params.coinType}>`;
-      const result = await getOwnedObjectsByType(account.address, fullCoinType);
-      
-      const nodes = result.data?.address?.objects?.nodes ?? [];
-      const coinObjectIds = nodes.map((n: any) => n.address);
+      // 1. Fetch coins of the required type using GraphQL (Skip for native SUI gas)
+      let coinObjectIds: string[] = [];
+      if (params.coinType !== "0x2::sui::SUI") {
+        const fullCoinType = `0x2::coin::Coin<${params.coinType}>`;
+        const result = await getOwnedObjectsByType(account.address, fullCoinType);
+        
+        const nodes = result.data?.address?.objects?.nodes ?? [];
+        coinObjectIds = nodes.map((n: any) => n.address);
 
-      if (coinObjectIds.length === 0) {
-        throw new Error(`No coins of type ${params.coinType} found in wallet.`);
+        if (coinObjectIds.length === 0) {
+          throw new Error(`No coins of type ${params.coinType} found in wallet.`);
+        }
       }
 
-      // 3. Pass coin object IDs to the builder (let the network fail if total balance is insufficient)
+      // 3. Pass coin object IDs to the builder
       const tx = buildCreateBountyTx({ ...params, coinObjectIds });
 
       const signResult = await signAndExecuteTransaction({ transaction: tx });
