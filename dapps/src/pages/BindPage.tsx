@@ -107,7 +107,6 @@ export function BindPage() {
           <ol style={{ paddingLeft: "1rem" }}>
             <li>Connect your EVE Vault wallet.</li>
             <li>We query your wallet address for a <code className="mono">PlayerProfile</code> object.</li>
-            <li>The <code className="mono">character_id</code> field is extracted and stored locally.</li>
             <li>Use this ID when posting or claiming bounties.</li>
           </ol>
         </div>

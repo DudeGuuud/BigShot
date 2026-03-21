@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Activity, Cpu, ShieldAlert, Target, Zap } from "lucide-react";
+import { Crosshair, Target, AlertTriangle, Coins, Zap } from "lucide-react";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { LoaderBars } from "../components/LoaderBars";
 import { ThreatBadge } from "../components/ThreatBadge";
 import { useCreateBounty } from "../hooks/useCreateBounty";
+import { useThreatAnalysis } from "../hooks/useThreatAnalysis";
 import {
   LUX_COIN_TYPE,
   EVE_COIN_TYPE,
@@ -11,84 +12,24 @@ import {
   TREASURY_EVE_ID,
 } from "../constants";
 
-type ThreatClass = "S" | "A" | "B" | "C" | "D";
-
-interface AnalysisResult {
-  targetId: string;
-  threatClass: ThreatClass;
-  threatLevel: number; // 0=D … 4=S
-  riskLevel: string;
-  activity: number;
-  assetValue: number;
-  aggression: number;
-  report: string;
-}
-
-// Rule-based threat calculation (deterministic, off-chain)
-function calcThreat(targetId: string): AnalysisResult {
-  const hash = targetId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const activity   = hash % 100;
-  const assetValue = (hash * 13) % 10000;
-  const aggression = hash % 10;
-  const score      = activity * 0.4 + assetValue * 0.00005 * 100 + aggression * 0.1 * 10;
-
-  let threatClass: ThreatClass = "D";
-  let threatLevel = 0;
-  let riskLevel = "LOW";
-  if      (score > 75) { threatClass = "S"; threatLevel = 4; riskLevel = "CRITICAL"; }
-  else if (score > 55) { threatClass = "A"; threatLevel = 3; riskLevel = "HIGH"; }
-  else if (score > 35) { threatClass = "B"; threatLevel = 2; riskLevel = "ELEVATED"; }
-  else if (score > 15) { threatClass = "C"; threatLevel = 1; riskLevel = "MODERATE"; }
-
-  return {
-    targetId,
-    threatClass,
-    threatLevel,
-    riskLevel,
-    activity,
-    assetValue,
-    aggression,
-    report: `[TACTICAL EVALUATION: FORMULA v4.2]
------------------------------------------
-ID: ${targetId}
-METRICS:
-  PILOT ACTIVITY:   ${activity}%       (w=0.40)
-  ASSET VALUE:      ${assetValue.toLocaleString()} LUX (w=0.50)
-  AGGRESSION IDX:   ${aggression}/10   (w=0.10)
-  COMPOSITE SCORE:  ${score.toFixed(1)}
-
-RESULT:
-  THREAT CLASS:  ${threatClass}
-  RISK LEVEL:    ${riskLevel}
------------------------------------------
-RECOMMENDATION:
-  Deploy specialised interdiction at
-  suspected transit nodes.`,
-  };
-}
+// Rule-based threat calculation// Removed mockup calcThreat
 
 export function CreatePage() {
   const account = useCurrentAccount();
   const { createBounty, loading: submitting, error: txError } = useCreateBounty();
+  const { analyze, analyzing: isAnalyzing, report: analysis, error: analyzeError } = useThreatAnalysis();
 
   const [targetId, setTargetId]   = useState("");
   const [amount,   setAmount]     = useState("");
   const [asset,    setAsset]      = useState("LUX");
   const [duration, setDuration]   = useState("72"); // hours
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis]   = useState<AnalysisResult | null>(null);
   const [txDigest, setTxDigest]   = useState<string | null>(null);
 
   const fee = amount ? (Number(amount) * 0.05).toFixed(2) : "0.00";
 
-  function startAnalysis() {
+  async function startAnalysis() {
     if (!targetId) return;
-    setIsAnalyzing(true);
-    setAnalysis(null);
-    setTimeout(() => {
-      setAnalysis(calcThreat(targetId));
-      setIsAnalyzing(false);
-    }, 1400);
+    await analyze(targetId);
   }
 
   async function handleSubmit() {
@@ -100,16 +41,20 @@ export function CreatePage() {
     // Amount in smallest unit (assuming 6 decimals for LUX; adjust per actual coin)
     const rawAmount   = BigInt(Math.floor(Number(amount) * 1_000_000));
 
+    // A to 3, S to 4, etc. Currently the backend uses 0-4
+    const threatLevelMapping: Record<string, number> = { "D": 0, "C": 1, "B": 2, "A": 3, "S": 4 };
+    const threatLevelNumber = threatLevelMapping[analysis.threatClass] || 0;
+
     try {
-      const result = await createBounty({
+      const res = await createBounty({
         treasuryId,
         coinType,
         targetCharacterId: targetId,
-        threatLevel: analysis.threatLevel,
+        threatLevel: threatLevelNumber,
         paymentAmount: rawAmount,
         durationMs,
       });
-      if (result) setTxDigest((result as { digest?: string }).digest ?? "submitted");
+      if (res) setTxDigest((res as { digest?: string }).digest ?? "submitted");
     } catch {
       // txError will reflect the failure
     }
@@ -138,7 +83,7 @@ export function CreatePage() {
         <section>
           <div className="industrial-panel">
             <p className="section-label" style={{ marginBottom: "1.5rem" }}>
-              <Activity size={14} /> 01 // Configuration
+              <Coins size={14} /> 01 // Configuration
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
@@ -209,7 +154,7 @@ export function CreatePage() {
         <section>
           <div className="industrial-panel scanline-panel" style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: "380px" }}>
             <p className="section-label" style={{ marginBottom: "1.5rem" }}>
-              <Cpu size={14} /> 02 // Tactical Intelligence
+              <Crosshair size={14} /> 02 // Tactical Intelligence
             </p>
 
             {isAnalyzing ? (
@@ -233,16 +178,19 @@ export function CreatePage() {
                   </div>
                 </div>
 
-                <pre style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "rgba(255,71,0,0.8)", whiteSpace: "pre-wrap", background: "rgba(255,71,0,0.04)", border: "1px solid rgba(255,71,0,0.12)", padding: "1rem", flex: 1 }}>
-                  {analysis.report}
-                </pre>
+                <pre className="mono" style={{ whiteSpace: "pre-wrap", background: "rgba(0,0,0,0.5)", border: "1px solid var(--eve-border)", padding: "1rem", fontSize: "0.75rem", color: "var(--brand)", lineHeight: "1.6" }}>
+                    {analysis.formattedReport}
+                  </pre>
 
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", opacity: 0.4, marginBottom: "0.6rem" }}>
-                    <ShieldAlert size={12} /> Confirmation Required
+                    <AlertTriangle size={12} /> Confirmation Required
                   </div>
+                  {analyzeError && (
+                    <p style={{ color: "var(--martian-red)", fontSize: "0.8rem", marginTop: "1rem" }}>{analyzeError}</p>
+                  )}
                   {txError && (
-                    <p style={{ fontSize: "0.7rem", color: "var(--martian-red)", marginBottom: "0.6rem" }}>{txError}</p>
+                    <p style={{ fontSize: "0.7rem", color: "var(--martian-red)", margin: "0.6rem 0" }}>{txError}</p>
                   )}
                   <button
                     className="eve-btn eve-btn--primary eve-btn--full"
