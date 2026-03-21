@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { getOwnedObjectsByType } from "@evefrontier/dapp-kit";
+import { getOwnedObjectsByType, getObjectWithJson } from "@evefrontier/dapp-kit";
 import { WORLD_PACKAGE_ID } from "../constants";
 
 const PLAYER_PROFILE_TYPE = `${WORLD_PACKAGE_ID}::character::PlayerProfile`;
@@ -28,12 +28,16 @@ export function useCharacterId() {
         throw new Error("No PlayerProfile found. Have you created a character in EVE Frontier?");
       }
       // PlayerProfile's `character_id` field is at the top level of JSON contents
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profile = nodes[0] as any;
-      const cid = profile?.asMoveObject?.contents?.json?.character_id?.toString();
+      const profileAddress = nodes[0].address;
+      const profileResult = await getObjectWithJson(profileAddress);
+      
+      const obj = profileResult.data?.object?.asMoveObject;
+      const json = obj?.contents?.json as any;
+      const cid = json?.character_id?.toString();
+      
       if (!cid) throw new Error("Could not read character_id from PlayerProfile.");
       setCharacterId(cid);
-      return cid;
+      return { characterId: cid, profileAddress };
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to resolve character ID";
       setError(msg);

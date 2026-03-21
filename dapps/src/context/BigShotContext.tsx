@@ -1,37 +1,25 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState} from "react";
 
 interface BigShotContextType {
   characterId: string | null;
-  setCharacterId: (id: string | null) => void;
+  profileObjectId: string | null;
+  setCharacterId: (id: string | null, profileObjId?: string | null) => void;
 }
 
 const BigShotContext = createContext<BigShotContextType | undefined>(undefined);
 
-const STORAGE_KEY = "bigshot-character-id";
-
 export const BigShotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [characterId, setCharacterIdState] = useState<string | null>(null);
+  const [profileObjectId, setProfileObjectIdState] = useState<string | null>(null);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setCharacterIdState(saved);
-    }
-  }, []);
-
-  // Update state and localStorage
-  const setCharacterId = (id: string | null) => {
+  // Update state without localStorage
+  const setCharacterId = (id: string | null, profileObjId?: string | null) => {
     setCharacterIdState(id);
-    if (id) {
-      localStorage.setItem(STORAGE_KEY, id);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    setProfileObjectIdState(profileObjId || null);
   };
 
   return (
-    <BigShotContext.Provider value={{ characterId, setCharacterId }}>
+    <BigShotContext.Provider value={{ characterId, profileObjectId, setCharacterId }}>
       {children}
     </BigShotContext.Provider>
   );

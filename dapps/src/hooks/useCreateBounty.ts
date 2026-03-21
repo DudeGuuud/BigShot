@@ -13,7 +13,7 @@ export function useCreateBounty() {
   const [error,   setError]     = useState<string | null>(null);
   const [txDigest, setTxDigest] = useState<string | null>(null);
 
-  async function createBounty(params: CreateBountyParams) {
+  async function createBounty(params: Omit<CreateBountyParams, "coinObjectIds">) {
     if (!account) {
       const msg = "Wallet not connected";
       setError(msg);
@@ -29,23 +29,13 @@ export function useCreateBounty() {
       const result = await getOwnedObjectsByType(account.address, fullCoinType);
       
       const nodes = result.data?.address?.objects?.nodes ?? [];
-      const coins = nodes.map((n: any) => ({
-        coinObjectId: n.address,
-        balance: n.asMoveObject?.contents?.json?.balance ?? "0",
-      }));
+      const coinObjectIds = nodes.map((n: any) => n.address);
 
-      if (coins.length === 0) {
+      if (coinObjectIds.length === 0) {
         throw new Error(`No coins of type ${params.coinType} found in wallet.`);
       }
 
-      // 2. Sum balance and check if sufficient
-      const totalBalance = coins.reduce((acc: bigint, c: any) => acc + BigInt(c.balance), BigInt(0));
-      if (totalBalance < params.paymentAmount) {
-        throw new Error(`Insufficient balance. Required: ${params.paymentAmount.toString()}, Available: ${totalBalance.toString()}`);
-      }
-
-      // 3. Pass coin object IDs to the builder
-      const coinObjectIds = coins.map((c: any) => c.coinObjectId);
+      // 3. Pass coin object IDs to the builder (let the network fail if total balance is insufficient)
       const tx = buildCreateBountyTx({ ...params, coinObjectIds });
 
       const signResult = await signAndExecuteTransaction({ transaction: tx });

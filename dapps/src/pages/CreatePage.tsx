@@ -106,7 +106,6 @@ export function CreatePage() {
         coinType,
         targetCharacterId: targetId,
         threatLevel: analysis.threatLevel,
-        coinObjectIds: [], // TODO: populate from wallet coin objects via useCurrentAccount
         paymentAmount: rawAmount,
         durationMs,
       });

@@ -1,43 +1,50 @@
-# Builder Scaffold
+# BigShot - EVE Frontier Bounty Interdiction System
 
-Templates and tools for building on EVE Frontier.
+BigShot is a decentralized bounty system built on the EVE Frontier Smart World framework using Sui Move. It allows players (issuers) to place trustless kill bounties on other players' characters. Hunters can claim these bounties by submitting verifiable proof of termination (Killmails) registered on-chain.
 
-## Prerequisites
+## 🚀 Features
 
-- [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-- [Docker](https://docs.docker.com/get-docker/) (for Docker path) **or** [Sui CLI](https://docs.sui.io/guides/developer/getting-started) + Node.js (for Host path)
+- **Trustless Escrow**: Bounties are locked in a shared `BigShot Treasury` object on the Sui network.
+- **Verifiable Interdictions**: Bounties can only be claimed using authenticated `Killmail` records from the EVE Frontier Killmail Registry, completely preventing fraud.
+- **Tactical Intelligence**: Leverages live on-chain interaction data (Gate Jumps, Storage Deposits/Withdrawals) alongside Killmails to generate a chronological Target Timeline.
+- **Auto-Asset Management**: Integrates seamlessly with EVE Vault to fetch owned LUX or EVE tokens dynamically to fund bounties.
+- **Persistent Identity**: Uses a local storage context to remember your `character_id` across sessions.
+- **Premium Aesthetics**: Industrial, utilitarian frontend built with Radix UI, Framer Motion, and pure CSS to mimic the immersive EVE terminal experience.
 
-## Quickstart
+## 📁 Architecture Overview
 
-**1. Clone the repo**:
-
-```bash
-mkdir -p workspace && cd workspace
-git clone https://github.com/evefrontier/builder-scaffold.git
-cd builder-scaffold
+```text
+├── bigshot_extension/     # Sui Move Smart Contracts
+│   ├── sources/
+│   │   ├── bigshot.move   # Core bounty system logic
+│   │   └── config.move    # Extension configuration
+│   └── Move.toml
+└── dapps/                 # Frontend React Application (Vite)
+    ├── src/
+    │   ├── components/    # Reusable UI (ThreatBadge, TacticalTimelineModal, etc.)
+    │   ├── context/       # Global State (BigShotContext for character ID)
+    │   ├── hooks/         # On-chain query hooks (GraphQL + Sui RPC)
+    │   ├── pages/         # Core views (Contract Board, Detail, Post Bounty)
+    │   ├── transactions/  # Sui PTB Builders (Claim, Create)
+    │   ├── constants.ts   # Envs and Contract Object IDs
+    │   └── utils/         # Formatting utilities
+    ├── index.html
+    └── package.json
 ```
 
-**2. Follow one flow** (world deploy → build custom contract → interact):
+## 🛠 Prerequisites & Installation
 
-| Path | When to use |
-|------|--------------|
-| **[Docker](./docs/builder-flow-docker.md)** | No Sui/Node on host; run everything in a container (local or testnet). Recommended for local testing  |
-| **[Host](./docs/builder-flow-host.md)** | Sui CLI + Node.js on your machine; target local or testnet. |
-| **[Building on an existing world](./docs/building-on-existing-world.md)** | World already deployed (e.g. shared server, live game); you don't deploy the world yourself. *(WIP – guide coming soon; use Docker/Host flows for now.)* |
+- Node.js >= 18
+- `bun` or `pnpm`
+- Sui CLI (for smart contract deployment)
 
-By the end you’ll have a deployed world (or use an existing one), a published custom contract (e.g. `smart_gate_extension`), and scripts that call it.
+```bash
+# Clone the repository
+cd bigshot-frontend/dapps
 
-## What's in this repo
+# Install dependencies
+bun install
 
-| Area | Purpose |
-|------|---------|
-| [docker/](./docker/readme.md) | Dev container (Sui CLI + Node.js) — used by the Docker flow. |
-| [move-contracts/](./move-contracts/readme.md) | Custom Smart Assembly examples (e.g. [smart_gate_extension](./move-contracts/smart_gate_extension/)); build & publish. |
-| [ts-scripts/](./ts-scripts/readme.md) | TypeScript scripts to call your contracts; run after publishing. |
-| [setup-world/](./setup-world/readme.md) | What “deploy world” does and what gets created (world flow steps are in the flow guides). |
-| [dapps/](./dapps/readme.md) | Reference dApp template (optional next step). |
-| [zklogin/](./zklogin/readme.md) | zkLogin CLI for OAuth-based signing (optional). |
-
-## Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) and open an issue or feature request before submitting PRs.
+# Start development server
+bun run dev
+```
