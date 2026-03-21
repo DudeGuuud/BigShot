@@ -1,6 +1,7 @@
 import { useConnection } from "@evefrontier/dapp-kit";
 import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { ArrowRight, Shield, Zap, Lock } from "lucide-react";
+import { useBounties, OnChainBounty } from "../hooks/useBounties";
 
 const FEATURES = [
   {
@@ -23,6 +24,20 @@ const FEATURES = [
 export function HomePage() {
   const { handleConnect } = useConnection();
   const account = useCurrentAccount();
+  const { bounties, loading: statsLoading } = useBounties();
+
+  const activeCount = bounties.filter((b: OnChainBounty) => !b.isClaimed && b.expiryTimestampMs > Date.now()).length;
+  const totalStaked = bounties
+    .filter((b: OnChainBounty) => !b.isClaimed)
+    .reduce((acc: number, b: OnChainBounty) => acc + b.rewardRaw, 0) / 1_000_000_000;
+  const killsConfirmed = bounties.filter((b: OnChainBounty) => b.isClaimed).length;
+
+  const stats = [
+    { label: "Active Bounties", val: statsLoading ? "..." : activeCount },
+    { label: "Total Staked (LUX)", val: statsLoading ? "..." : totalStaked.toLocaleString() },
+    { label: "Kills Confirmed", val: statsLoading ? "..." : (killsConfirmed || "—") },
+    { label: "Protocol Version", val: "v0.1.0" },
+  ];
 
   return (
     <div style={{ paddingTop: "4rem", paddingBottom: "4rem" }}>
@@ -33,7 +48,7 @@ export function HomePage() {
         </p>
         <h1 className="page-title" style={{ marginBottom: "1.5rem" }}>
           Hunt.<br />
-          <span className="dim">Collect.</span><br />
+          <span style={{ color: "var(--brand)" }}>Collect.</span><br />
           Survive.
         </h1>
         <p style={{ fontSize: "1rem", color: "rgba(250,250,229,0.5)", lineHeight: "1.7", marginBottom: "2.5rem", maxWidth: "480px" }}>
@@ -76,12 +91,7 @@ export function HomePage() {
         className="industrial-panel"
         style={{ marginTop: "4rem", display: "flex", gap: "3rem", flexWrap: "wrap" }}
       >
-        {[
-          { label: "Active Bounties", val: "—" },
-          { label: "Total Staked (LUX)", val: "—" },
-          { label: "Kills Confirmed", val: "—" },
-          { label: "Protocol Version", val: "v0.1.0" },
-        ].map((s) => (
+        {stats.map((s) => (
           <div key={s.label}>
             <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", color: "rgba(250,250,229,0.3)", marginBottom: "0.3rem" }}>
               {s.label}

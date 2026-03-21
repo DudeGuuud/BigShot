@@ -47,6 +47,7 @@ export function useBountyDetail(objectId: string) {
           issuer: String(json?.issuer ?? ""),
           targetCharacterId: String(json?.target_character_id ?? ""),
           rewardAmount: rewardRaw.toLocaleString(),
+          rewardRaw,
           coinType,
           asset: isSui ? "SUI" : "EVE",
           expiryTimestampMs: expiryMs,

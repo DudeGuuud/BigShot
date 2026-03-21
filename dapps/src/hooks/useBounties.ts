@@ -17,6 +17,7 @@ export interface OnChainBounty {
   expiryTimestampMs: number;
   threatLevel: number;
   threatClass: "S" | "A" | "B" | "C" | "D";
+  rewardRaw: number;
   isClaimed: boolean;
 }
 
@@ -38,6 +39,7 @@ function parseBounty(id: string, json: any, coinType: string): OnChainBounty {
     issuer: json?.issuer ?? "",
     targetCharacterId: String(json?.target_character_id ?? ""),
     rewardAmount: rewardRaw.toLocaleString(),
+    rewardRaw,
     coinType,
     asset: coinType.includes("sui") ? "SUI" : "EVE",
     expiryTimestampMs: expiryMs,
