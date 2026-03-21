@@ -19,7 +19,7 @@ export function ListPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1.5rem", marginBottom: "2.5rem" }}>
         <div>
           <h1 className="page-title" style={{ marginBottom: "0.5rem" }}>
-            Contract <span className="dim">Board</span>
+            Contract <span style={{ color: "var(--brand)" }}>Board</span>
           </h1>
           <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
             Live on-chain kill contracts within Frontier nodes.

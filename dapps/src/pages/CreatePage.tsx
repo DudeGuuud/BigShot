@@ -94,7 +94,7 @@ export function CreatePage() {
     <div style={{ paddingTop: "3rem", maxWidth: "900px" }}>
       <div style={{ marginBottom: "2.5rem" }}>
         <h1 className="page-title" style={{ marginBottom: "0.5rem" }}>
-          Post <span className="dim">Bounty</span>
+          Post <span style={{ color: "var(--brand)" }}>Bounty</span>
         </h1>
         <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)" }}>
           Stake EVE Token or native SUI against a target character. Rewards held in trustless escrow.

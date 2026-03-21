@@ -34,7 +34,7 @@ export function BindPage() {
     <div style={{ paddingTop: "3rem", maxWidth: "560px" }}>
       <div style={{ marginBottom: "2.5rem" }}>
         <h1 className="page-title" style={{ marginBottom: "0.5rem" }}>
-          Bind <span className="dim">Identity</span>
+          Bind <span style={{ color: "var(--brand)" }}>Identity</span>
         </h1>
         <p style={{ fontSize: "0.8rem", color: "rgba(250,250,229,0.4)", lineHeight: "1.6" }}>
           Link your EVE Vault wallet to your Frontier character.
