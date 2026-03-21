@@ -1,13 +1,13 @@
 import { useState, useCallback } from "react";
 import { getObjectWithJson } from "@evefrontier/dapp-kit";
-import { LUX_COIN_TYPE, KILLMAIL_REGISTRY_ID } from "../constants";
+import { EVE_COIN_TYPE, KILLMAIL_REGISTRY_ID } from "../constants";
 
 export interface TacticalReport {
   targetId: string;
   walletAddress: string;
   pilotName: string;
   tribeId: number;
-  luxBalance: number;
+  eveBalance: number;
   recentKills: number;
   recentDeaths: number;
   logisticsActivity: number;
@@ -60,7 +60,7 @@ export function useThreatAnalysis() {
           jsonrpc: "2.0",
           id: 1,
           method: "suix_getBalance",
-          params: [walletAddress, LUX_COIN_TYPE]
+          params: [walletAddress, EVE_COIN_TYPE]
         })
       }).then(res => res.json()).catch(() => null);
 
@@ -106,9 +106,10 @@ export function useThreatAnalysis() {
       const [rpcData, kmData, ownedData] = await Promise.all([rpcFetch, gqlFetch, ownedObjectsFetch]);
 
       // Parse Balance
-      let luxBalance = 0;
+      let eveBalance = 0;
       if (rpcData?.result?.totalBalance) {
-        luxBalance = Number(rpcData.result.totalBalance) / 1_000_000;
+        // 9 decimals for EVE Coin (standard Sui token decimal)
+        eveBalance = Number(rpcData.result.totalBalance) / 1_000_000_000;
       }
 
       // Parse PvP Activity (Kills / Deaths)
@@ -142,12 +143,12 @@ export function useThreatAnalysis() {
       // 3. Compute Multidimensional Threat Score
       let score = 0;
       
-      // Asset weight
-      if (luxBalance > 50000) score += 5;
-      else if (luxBalance > 10000) score += 4;
-      else if (luxBalance > 5000) score += 3;
-      else if (luxBalance > 1000) score += 2;
-      else if (luxBalance > 0) score += 1;
+      // Asset weight (EVE)
+      if (eveBalance > 50000) score += 5;
+      else if (eveBalance > 10000) score += 4;
+      else if (eveBalance > 5000) score += 3;
+      else if (eveBalance > 1000) score += 2;
+      else if (eveBalance > 0) score += 1;
 
       // PvP Combat Weight
       score += (recentKills * 0.8);
@@ -185,7 +186,7 @@ ALIAS:      ${pilotName}
 TRIBE ID:   ${tribeId}
 -----------------------------------------
 METRICS:
-  CONFIRMED ASSETS: ${luxBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} LUX
+  CONFIRMED ASSETS: ${eveBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} EVE
   RECENT KILLS:     ${recentKills}
   RECENT DEATHS:    ${recentDeaths}
   SSU DEPLOYMENTS:  ${logisticsActivity > 0 ? logisticsActivity + " Storage Units" : "None"}
@@ -204,7 +205,7 @@ ${threatClass === "S" || threatClass === "A" ? "🎯 HIGH VALUE TARGET. Recommen
         walletAddress,
         pilotName,
         tribeId,
-        luxBalance,
+        eveBalance,
         recentKills,
         recentDeaths,
         logisticsActivity,

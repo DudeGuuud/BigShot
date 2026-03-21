@@ -10,8 +10,7 @@ export const WORLD_PACKAGE_ID: string = import.meta.env.VITE_EVE_WORLD_PACKAGE_I
 // LUX coin type (game-internal credit)
 export const LUX_COIN_TYPE = `${WORLD_PACKAGE_ID}::lux::LUX`;
 
-// EVE Token coin type
-export const EVE_COIN_TYPE = `${WORLD_PACKAGE_ID}::eve_token::EVE_TOKEN`;
+export const EVE_COIN_TYPE: string = import.meta.env.VITE_EVE_TOKEN_TYPE;
 
 // PlayerProfile object type — used to look up character_id from wallet address
 export const PLAYER_PROFILE_TYPE = `${WORLD_PACKAGE_ID}::character::PlayerProfile`;
