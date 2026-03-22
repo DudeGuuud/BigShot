@@ -80,30 +80,30 @@ export function TacticalTimelineModal({ targetCharacterId, targetName }: Tactica
                     </Text>
                   </Flex>
 
-                  <Box mt="2">
-                    {event.type === 'Killmail' && (
-                      <Flex direction="column" gap="1">
-                         <Text size="2"><b>Location:</b> {event.locationId}</Text>
-                         <Text size="2" color="gray">Killmail ID: <a href={`https://explorer.sui.io/object/${(event as any).transactionDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>View on Explorer</a></Text>
-                      </Flex>
-                    )}
-                    {event.type === 'Jump' && (
-                      <Flex direction="column" gap="1">
-                         <Text size="2"><b>Arrival Location:</b> Gateway {event.locationId}</Text>
-                         {event.txDigest && (
-                           <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
-                         )}
-                      </Flex>
-                    )}
-                    {(event.type === 'Deposit' || event.type === 'Withdraw') && (
-                      <Flex direction="column" gap="1">
-                         <Text size="2"><b>Smart Storage:</b> {event.locationId}</Text>
-                         {event.txDigest && (
-                           <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
-                         )}
-                      </Flex>
-                    )}
-                  </Box>
+                    <Box mt="2">
+                      {event.type === 'Killmail' && (
+                        <Flex direction="column" gap="1">
+                          <Text size="2"><b>Location:</b> <Text color="yellow">{event.locationName}</Text> <Text size="1" color="gray">({event.locationId})</Text></Text>
+                          <Text size="2" color="gray">Killmail ID: <a href={`https://explorer.sui.io/object/${(event as any).id.split('-').pop()}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>View on Explorer</a></Text>
+                        </Flex>
+                      )}
+                      {event.type === 'Jump' && (
+                        <Flex direction="column" gap="1">
+                          <Text size="2"><b>Arrival:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          {event.txDigest && (
+                            <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
+                          )}
+                        </Flex>
+                      )}
+                      {(event.type === 'Deposit' || event.type === 'Withdraw') && (
+                        <Flex direction="column" gap="1">
+                          <Text size="2"><b>Sector/Unit:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          {event.txDigest && (
+                            <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
+                          )}
+                        </Flex>
+                      )}
+                    </Box>
                   <Text size="1" color="gray" mt="2" style={{ display: "block" }}>
                     {new Date(event.timestamp).toLocaleString()}
                   </Text>

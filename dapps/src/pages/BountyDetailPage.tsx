@@ -11,6 +11,7 @@ import { TacticalTimelineModal } from "../components/TacticalTimelineModal";
 import { IS_CONTRACT_DEPLOYED } from "../constants";
 import { formatCountdown, formatAddress } from "../utils/formatters";
 import { useBigShot } from "../context/BigShotContext";
+import { getStarSystemName } from "../utils/systems";
 
 export function BountyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -135,7 +136,7 @@ export function BountyDetailPage() {
                 <div>
                   <span className="dim" style={{ fontSize: "0.7rem", textTransform: "uppercase" }}>Last Known Area</span>
                   <div style={{ fontWeight: 700, fontSize: "0.95rem", marginTop: "0.2rem", color: lastSeen ? "var(--brand)" : "var(--eve-text)" }}>
-                    {lastSeenLoading ? "SCANNING..." : (lastSeen ? lastSeen.solarSystemId : "UNKNOWN DEEP SPACE")}
+                    {lastSeenLoading ? "SCANNING..." : (lastSeen ? getStarSystemName(lastSeen.solarSystemId) : "UNKNOWN DEEP SPACE")}
                   </div>
                 </div>
                 <div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { KILLMAIL_REGISTRY_ID } from "../constants";
+import { getStarSystemName } from "../utils/systems";
 
 const SUI_GRAPHQL_URL = import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT || "https://graphql.testnet.sui.io/graphql";
 
@@ -7,6 +8,7 @@ export type TimelineEvent = {
   id: string;
   type: "Killmail" | "Jump" | "Deposit" | "Withdraw" | "Unknown";
   locationId: string;
+  locationName: string; // Human-readable name
   timestamp: number;
   txDigest: string;
 };
@@ -99,6 +101,7 @@ export function useLastSeen(targetCharacterId: string) {
               id: "km-" + contents.id?.id,
               type: "Killmail",
               locationId: contents.solar_system_id?.item_id || "Unknown Sector",
+              locationName: getStarSystemName(contents.solar_system_id?.item_id || ""),
               timestamp: Number(contents.kill_timestamp) * 1000,
               txDigest: "N/A"
             });
@@ -128,6 +131,7 @@ export function useLastSeen(targetCharacterId: string) {
             id: ev.id.txDigest + "-" + ev.id.eventSeq,
             type: eventType,
             locationId: locId,
+            locationName: locId.startsWith("0x") ? `Gate ${locId.slice(0, 6)}` : getStarSystemName(locId),
             timestamp: Number(ev.timestampMs || 0),
             txDigest: ev.id.txDigest
           });
