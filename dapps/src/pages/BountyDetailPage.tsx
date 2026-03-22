@@ -67,6 +67,8 @@ export function BountyDetailPage() {
     }
   }
 
+  const [modalOpen, setModalOpen] = useState(false);
+
   if (detailLoading) {
     return (
       <div style={{ paddingTop: "5rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem" }}>
@@ -129,7 +131,19 @@ export function BountyDetailPage() {
               <h3 style={{ fontSize: "0.8rem", color: "var(--brand)", textTransform: "uppercase", letterSpacing: "0.15em", display: "flex", alignItems: "center", gap: "0.5rem", margin: 0 }}>
                 <MapPin size={14} /> TACTICAL INTELLIGENCE
               </h3>
-              <TacticalTimelineModal targetCharacterId={bounty.targetCharacterId} targetName={displayTarget} />
+              <button 
+                className="eve-btn" 
+                style={{ padding: "0.2rem 0.6rem", fontSize: "0.6rem" }}
+                onClick={() => setModalOpen(true)}
+              >
+                View Full Timeline
+              </button>
+              <TacticalTimelineModal 
+                targetCharacterId={bounty.targetCharacterId} 
+                targetName={displayTarget} 
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+              />
             </div>
             <div style={{ background: "rgba(250,250,229,0.03)", border: "1px solid var(--eve-border)", padding: "1rem" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>

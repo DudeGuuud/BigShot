@@ -20,3 +20,6 @@ dapps/frontend
 
 .pnpm-store/
 move-contracts/**/build/**/
+dapps/dist/
+dist/
+.world-contracts
