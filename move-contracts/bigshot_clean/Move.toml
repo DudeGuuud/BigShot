@@ -1,0 +1,12 @@
+[package]
+name = "bigshot_extension"
+edition = "2024"
+# authors = ["BigShot Team"]
+
+[dependencies]
+world = { local = "../../../.world-contracts/contracts/world" }
+
+[environments]
+testnet_internal = "4c78adac"
+testnet_utopia    = "4c78adac"
+testnet_stillness = "4c78adac"

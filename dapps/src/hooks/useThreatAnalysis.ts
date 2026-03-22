@@ -136,8 +136,9 @@ export function useThreatAnalysis() {
         const kmJson = node.value?.contents?.json || node.value?.json;
         if (!kmJson || !kmJson.killer_id || !kmJson.victim_id) continue;
         
-        if (kmJson.killer_id === targetCharacterId) recentKills++;
-        if (kmJson.victim_id === targetCharacterId) recentDeaths++;
+        // Ensure string comparison for u64 IDs
+        if (String(kmJson.killer_id) === String(targetCharacterId)) recentKills++;
+        if (String(kmJson.victim_id) === String(targetCharacterId)) recentDeaths++;
       }
 
       // Parse Smart Deployments & Infrastructure

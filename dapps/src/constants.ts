@@ -39,7 +39,7 @@ export const SUI_CLOCK_OBJECT_ID = "0x000000000000000000000000000000000000000000
 
 /** True when all BigShot contract IDs have been configured */
 export const IS_CONTRACT_DEPLOYED =
-  !!BIGSHOT_PACKAGE_ID && !!EXTENSION_CONFIG_ID && !!TREASURY_LUX_ID;
+  !!BIGSHOT_PACKAGE_ID && !!EXTENSION_CONFIG_ID && (!!TREASURY_EVE_ID || !!TREASURY_SUI_ID);
 
 /** BigShot Bounty object type string — used for GraphQL queries */
 export const BOUNTY_TYPE = (coinType: string) =>

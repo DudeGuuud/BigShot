@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Search, Filter, ArrowUpRight, Loader2, AlertTriangle } from "lucide-react";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { Button } from "@radix-ui/themes";
 import { ThreatBadge } from "../components/ThreatBadge";
 import { TacticalTimelineModal } from "../components/TacticalTimelineModal";
 import { useBounties } from "../hooks/useBounties";
@@ -8,14 +10,26 @@ export function ListPage() {
   const [search, setSearch] = useState("");
   const { bounties: onChainBounties, loading, error } = useBounties();
 
+  // Modal State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState<string>("");
+  const [selectedName, setSelectedName] = useState<string>("");
+
   const filtered = onChainBounties.filter((b) =>
     b.targetCharacterId.toLowerCase().includes(search.toLowerCase()) ||
-    b.issuer.toLowerCase().includes(search.toLowerCase()),
+    b.issuer.toLowerCase().includes(search.toLowerCase()) ||
+    b.pilotAlias.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const openTimeline = (targetId: string, name: string) => {
+    setSelectedTarget(targetId);
+    setSelectedName(name);
+    setModalOpen(true);
+  };
 
   return (
     <div style={{ paddingTop: "3rem" }}>
-      {/* Page header */}
+      {/* ... header code ... */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1.5rem", marginBottom: "2.5rem" }}>
         <div>
           <h1 className="page-title" style={{ marginBottom: "0.5rem" }}>
@@ -32,7 +46,7 @@ export function ListPage() {
           <input
             type="text"
             className="form-input"
-            placeholder="SEARCH CONTRACTS..."
+            placeholder="SEARCH PILOTS..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ border: "none", background: "transparent", width: "220px", padding: "0.4rem 0.5rem" }}
@@ -68,6 +82,7 @@ export function ListPage() {
               <thead>
                 <tr>
                   <th>Threat</th>
+                  <th>Pilot</th>
                   <th>Target ID</th>
                   <th>Reward</th>
                   <th>Issuer</th>
@@ -78,7 +93,7 @@ export function ListPage() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", padding: "3rem", opacity: 0.3, fontSize: "0.8rem" }}>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "3rem", opacity: 0.3, fontSize: "0.8rem" }}>
                       No active contracts found.
                     </td>
                   </tr>
@@ -89,13 +104,15 @@ export function ListPage() {
                     <tr key={b.id} style={{ cursor: "pointer" }}>
                       <td><ThreatBadge level={b.threatClass} /></td>
                       <td>
-                        <a href={`#/bounty/${b.id}`} style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                          <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.9rem" }}>
+                         <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--brand)" }}>
+                           {b.pilotAlias}
+                         </span>
+                      </td>
+                      <td>
+                        <a href={`#/bounty/${b.id}`} onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                          <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8rem", opacity: 0.7 }}>
                             {b.targetCharacterId}
-                            <ArrowUpRight size={12} style={{ color: "var(--brand)", opacity: 0.6 }} />
-                          </span>
-                          <span className="mono dim" style={{ fontSize: "0.65rem" }}>
-                            {b.id.startsWith("0x") ? `${b.id.slice(0, 10)}…${b.id.slice(-4)}` : `0x${b.id.toUpperCase()}…7F`}
+                            <ArrowUpRight size={10} style={{ color: "var(--brand)", opacity: 0.4 }} />
                           </span>
                         </a>
                       </td>
@@ -116,7 +133,19 @@ export function ListPage() {
                         </span>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        <TacticalTimelineModal targetCharacterId={b.targetCharacterId} />
+                        <Button 
+                          variant="soft" 
+                          size="2" 
+                          color="blue" 
+                          style={{ cursor: "pointer" }}
+                          onClick={(e) => {
+                             e.stopPropagation();
+                             console.log("Timeline clicked for:", b.targetCharacterId);
+                             openTimeline(b.targetCharacterId, b.pilotAlias);
+                          }}
+                        >
+                          <MagnifyingGlassIcon /> Timeline
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -126,6 +155,14 @@ export function ListPage() {
           </div>
         </div>
       )}
+
+      {/* Shared Modal */}
+      <TacticalTimelineModal 
+        targetCharacterId={selectedTarget} 
+        targetName={selectedName} 
+        open={modalOpen} 
+        onOpenChange={setModalOpen}
+      />
 
       <div style={{ display: "flex", justifyContent: "center", marginTop: "2.5rem" }}>
         <button className="eve-btn" style={{ padding: "0.6rem 3rem" }}>Load Archived Records</button>

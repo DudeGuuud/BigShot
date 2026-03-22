@@ -10,3 +10,11 @@ export function formatAddress(address: string) {
   if (!address) return "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
+
+export function formatTokenAmount(raw: number | string) {
+  const val = typeof raw === 'string' ? Number(raw) : raw;
+  return (val / 1_000_000_000).toLocaleString(undefined, { 
+    minimumFractionDigits: 0, 
+    maximumFractionDigits: 4 
+  });
+}

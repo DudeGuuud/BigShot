@@ -55,6 +55,9 @@ export function useLastSeen(targetCharacterId: string) {
         // Ensure graceful failure if the RPC node does not support MoveEventField
         const eventsPromise = new Promise<any>(async (resolve) => {
           try {
+            const worldV1 = "0xd12a70c74c1e759445d6f209b01d43d860e97fcf2ef72ccbbd00afd828043f75";
+            const worldV2 = "0x33226d2eedda428eb7e1a56faf525bd5300f9394a5d61ffbbbcb3993d45a7145";
+            
             const res = await fetch("https://fullnode.testnet.sui.io/", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -63,9 +66,16 @@ export function useLastSeen(targetCharacterId: string) {
                 id: 1,
                 method: "suix_queryEvents",
                 params: [
-                  { MoveEventField: { path: "character_id", value: targetCharacterId } },
+                  { Any: [
+                    { MoveEventType: `${worldV1}::gate::JumpEvent` },
+                    { MoveEventType: `${worldV2}::gate::JumpEvent` },
+                    { MoveEventType: `${worldV1}::inventory::ItemDepositedEvent` },
+                    { MoveEventType: `${worldV2}::inventory::ItemDepositedEvent` },
+                    { MoveEventType: `${worldV1}::inventory::ItemWithdrawnEvent` },
+                    { MoveEventType: `${worldV2}::inventory::ItemWithdrawnEvent` }
+                  ]},
                   null,
-                  20,
+                  100, // Fetch more to filter locally
                   true
                 ]
               })
@@ -96,13 +106,16 @@ export function useLastSeen(targetCharacterId: string) {
         for (const node of nodes) {
           const contents = node.value?.contents?.json;
           if (!contents) continue;
-          if (contents.victim_id?.item_id === targetCharacterId) {
+          
+          // In Version 2, IDs are u64 (strings in JSON)
+          const victimId = String(contents.victim_id?.item_id || "");
+          if (victimId === String(targetCharacterId)) {
             compiledTimeline.push({
-              id: "km-" + contents.id?.id,
+              id: "km-" + (contents.id?.id || Math.random().toString()),
               type: "Killmail",
-              locationId: contents.solar_system_id?.item_id || "Unknown Sector",
-              locationName: getStarSystemName(contents.solar_system_id?.item_id || ""),
-              timestamp: Number(contents.kill_timestamp) * 1000,
+              locationId: String(contents.solar_system_id?.item_id || "Unknown Sector"),
+              locationName: getStarSystemName(String(contents.solar_system_id?.item_id || "")),
+              timestamp: Number(contents.kill_timestamp || 0) * 1000,
               txDigest: "N/A"
             });
           }
@@ -115,12 +128,15 @@ export function useLastSeen(targetCharacterId: string) {
           const json = ev.parsedJson as Record<string, any>;
 
           if (ev.type.includes("::gate::JumpEvent")) {
+            if (String(json.character_id) !== String(targetCharacterId)) continue;
             eventType = "Jump";
             locId = json.source_gate_id || "Unknown Gate";
           } else if (ev.type.includes("::inventory::ItemDepositedEvent")) {
+            if (String(json.character_id) !== String(targetCharacterId)) continue;
             eventType = "Deposit";
             locId = json.assembly_id || "Unknown SSU";
           } else if (ev.type.includes("::inventory::ItemWithdrawnEvent")) {
+            if (String(json.character_id) !== String(targetCharacterId)) continue;
             eventType = "Withdraw";
             locId = json.assembly_id || "Unknown SSU";
           } else {
