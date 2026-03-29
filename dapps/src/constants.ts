@@ -4,7 +4,7 @@
  * After `sui client publish`, fill in the deployment-specific IDs.
  */
 
-// ─── EVE Frontier World (testnet) ────────────────────────────────────────────
+// ─── EVE Frontier World — Utopia (testnet) ───────────────────────────────────
 export const WORLD_PACKAGE_ID: string = import.meta.env.VITE_EVE_WORLD_PACKAGE_ID;
 
 // LUX coin type (game-internal credit)
@@ -18,8 +18,14 @@ export const SUI_COIN_TYPE = "0x2::sui::SUI";
 // PlayerProfile object type — used to look up character_id from wallet address
 export const PLAYER_PROFILE_TYPE = `${WORLD_PACKAGE_ID}::character::PlayerProfile`;
 
+// Character object type — used for pilot name resolution (Utopia V2 only)
+export const CHARACTER_TYPE = `${WORLD_PACKAGE_ID}::character::Character`;
+
 // Sui GraphQL endpoint
 export const GRAPHQL_URL: string = import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT;
+
+// Sui Fullnode RPC endpoint
+export const SUI_RPC_URL = "https://fullnode.testnet.sui.io/";
 
 // ─── BigShot Extension (fill in after deploy) ────────────────────────────────
 export const BIGSHOT_PACKAGE_ID: string = import.meta.env.VITE_BIGSHOT_PACKAGE_ID;
@@ -32,7 +38,13 @@ export const TREASURY_EVE_ID: string = import.meta.env.VITE_TREASURY_EVE_ID;
 
 export const TREASURY_SUI_ID: string = import.meta.env.VITE_TREASURY_SUI_ID;
 
+// ─── Utopia Registries (verified on-chain) ────────────────────────────────────
 export const KILLMAIL_REGISTRY_ID: string = import.meta.env.VITE_KILLMAIL_REGISTRY_ID;
+export const OBJECT_REGISTRY_ID: string = import.meta.env.VITE_OBJECT_REGISTRY_ID || "";
+export const LOCATION_REGISTRY_ID: string = import.meta.env.VITE_LOCATION_REGISTRY_ID || "";
+
+// ─── Utopia World API ─────────────────────────────────────────────────────────
+export const UTOPIA_WORLD_API = "https://world-api-utopia.uat.pub.evefrontier.com";
 
 // ─── Sui system constants ─────────────────────────────────────────────────────
 export const SUI_CLOCK_OBJECT_ID = "0x0000000000000000000000000000000000000000000000000000000000000006";
@@ -44,3 +56,4 @@ export const IS_CONTRACT_DEPLOYED =
 /** BigShot Bounty object type string — used for GraphQL queries */
 export const BOUNTY_TYPE = (coinType: string) =>
   `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${coinType}>`;
+

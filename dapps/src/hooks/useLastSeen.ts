@@ -1,17 +1,59 @@
-import { useState, useEffect } from "react";
-import { KILLMAIL_REGISTRY_ID } from "../constants";
-import { getStarSystemName } from "../utils/systems";
+/**
+ * useLastSeen — Tactical Timeline hook.
+ *
+ * Fetches all on-chain activity for a target character:
+ * - KillmailCreatedEvent (combat kills/deaths)
+ * - JumpEvent (gate travel)
+ * - ItemDepositedEvent (SSU interactions)
+ * - ItemWithdrawnEvent (SSU interactions)
+ *
+ * All event queries are batched into a single HTTP request via JSON-RPC batch.
+ *
+ * Target matching:
+ * - Events use `character_id` (Sui Object ID, hex) and `character_key.item_id` (u64 string)
+ * - Killmails use `killer_id.item_id` / `victim_id.item_id` (u64 strings)
+ * - We match against BOTH formats to maximize coverage
+ */
 
-const SUI_GRAPHQL_URL = import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT || "https://graphql.testnet.sui.io/graphql";
+import { useState, useEffect } from "react";
+import { fetchEventsBatch, UTOPIA_EVENT_TYPES } from "../utils/suiClient";
+import { getStarSystemName } from "../utils/systems";
 
 export type TimelineEvent = {
   id: string;
   type: "Killmail" | "Jump" | "Deposit" | "Withdraw" | "Unknown";
   locationId: string;
-  locationName: string; // Human-readable name
+  locationName: string;
   timestamp: number;
   txDigest: string;
+  /** Role of the target in this event */
+  role?: "killer" | "victim" | "traveler" | "depositor" | "withdrawer";
+  /** Additional context (e.g., gate IDs, item types) */
+  detail?: string;
 };
+
+/**
+ * Check if a target ID matches a character in an event.
+ * Events have both `character_id` (Sui hex ID) and `character_key.item_id` (u64).
+ * The target could be either format depending on how the bounty stores it.
+ */
+function matchesTarget(
+  targetId: string,
+  suiObjectId: string | undefined,
+  tenantItemId: { item_id?: string } | undefined
+): boolean {
+  if (!targetId) return false;
+  const targetNorm = targetId.toLowerCase();
+
+  // Match Sui Object ID
+  if (suiObjectId && suiObjectId.toLowerCase() === targetNorm) return true;
+
+  // Match u64 item_id
+  if (tenantItemId?.item_id && String(tenantItemId.item_id) === targetId)
+    return true;
+
+  return false;
+}
 
 export function useLastSeen(targetCharacterId: string) {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
@@ -19,159 +61,211 @@ export function useLastSeen(targetCharacterId: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!targetCharacterId || !KILLMAIL_REGISTRY_ID) {
+    if (!targetCharacterId) {
       setTimeline([]);
       return;
     }
 
-    async function fetchChronology() {
+    let cancelled = false;
+
+    async function fetchTimeline() {
       setLoading(true);
       setError(null);
       try {
-        const query = `
-          query GetLastSeenKillmail($registryId: SuiAddress!) {
-            object(address: $registryId) {
-              dynamicFields(first: 50) {
-                nodes {
-                  name { type { repr } json }
-                  value {
-                    ... on MoveValue { type { repr } json }
-                    ... on MoveObject { contents { type { repr } json } }
-                  }
-                }
-              }
-            }
-          }
-        `;
+        // ── Single batched RPC call for ALL event types ──
+        const events = await fetchEventsBatch(
+          [
+            UTOPIA_EVENT_TYPES.killmailCreated,
+            UTOPIA_EVENT_TYPES.jump,
+            UTOPIA_EVENT_TYPES.itemDeposited,
+            UTOPIA_EVENT_TYPES.itemWithdrawn,
+          ],
+          50 // per event type
+        );
 
-        // 1. Fetch Killmails via GraphQL (Parallel)
-        const killmailPromise = fetch(SUI_GRAPHQL_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, variables: { registryId: KILLMAIL_REGISTRY_ID } }),
-        }).then(res => res.json());
+        if (cancelled) return;
 
-        // 2. Fetch Interaction Events via Sui RPC (Parallel)
-        // Ensure graceful failure if the RPC node does not support MoveEventField
-        const eventsPromise = new Promise<any>(async (resolve) => {
-          try {
-            const worldV1 = "0xd12a70c74c1e759445d6f209b01d43d860e97fcf2ef72ccbbd00afd828043f75";
-            const worldV2 = "0x33226d2eedda428eb7e1a56faf525bd5300f9394a5d61ffbbbcb3993d45a7145";
-            
-            const res = await fetch("https://fullnode.testnet.sui.io/", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 1,
-                method: "suix_queryEvents",
-                params: [
-                  { Any: [
-                    { MoveEventType: `${worldV1}::gate::JumpEvent` },
-                    { MoveEventType: `${worldV2}::gate::JumpEvent` },
-                    { MoveEventType: `${worldV1}::inventory::ItemDepositedEvent` },
-                    { MoveEventType: `${worldV2}::inventory::ItemDepositedEvent` },
-                    { MoveEventType: `${worldV1}::inventory::ItemWithdrawnEvent` },
-                    { MoveEventType: `${worldV2}::inventory::ItemWithdrawnEvent` }
-                  ]},
-                  null,
-                  100, // Fetch more to filter locally
-                  true
-                ]
-              })
-            }).then(r => r.json());
-            
-            if (res.error) {
-               console.warn("RPC fetch error:", res.error);
-               resolve({ data: [] });
-            } else {
-               resolve(res.result || { data: [] });
-            }
-          } catch (e) {
-            console.warn("RPC fetch failed or event indexer not supported for dynamic fields, falling back to GraphQL killmails only.", e);
-            resolve({ data: [] });
-          }
-        });
+        const compiled: TimelineEvent[] = [];
 
-        const [graphqlResult, eventsResult] = await Promise.all([killmailPromise, eventsPromise]);
+        for (const ev of events) {
+          const json = ev.parsedJson;
 
-        if (graphqlResult.errors) {
-          throw new Error(graphqlResult.errors[0]?.message || "GraphQL Error");
-        }
+          // ── KillmailCreatedEvent ──
+          if (ev.type.includes("::killmail::KillmailCreatedEvent")) {
+            const isKiller = matchesTarget(
+              targetCharacterId,
+              undefined,
+              json.killer_id
+            );
+            const isVictim = matchesTarget(
+              targetCharacterId,
+              undefined,
+              json.victim_id
+            );
+            if (!isKiller && !isVictim) continue;
 
-        const compiledTimeline: TimelineEvent[] = [];
-
-        // Parse Killmails
-        const nodes = graphqlResult.data?.object?.dynamicFields?.nodes || [];
-        for (const node of nodes) {
-          const contents = node.value?.contents?.json;
-          if (!contents) continue;
-          
-          // In Version 2, IDs are u64 (strings in JSON)
-          const victimId = String(contents.victim_id?.item_id || "");
-          if (victimId === String(targetCharacterId)) {
-            compiledTimeline.push({
-              id: "km-" + (contents.id?.id || Math.random().toString()),
+            const solarSystemId = String(
+              json.solar_system_id?.item_id || ""
+            );
+            compiled.push({
+              id: `km-${ev.txDigest}-${ev.eventSeq}`,
               type: "Killmail",
-              locationId: String(contents.solar_system_id?.item_id || "Unknown Sector"),
-              locationName: getStarSystemName(String(contents.solar_system_id?.item_id || "")),
-              timestamp: Number(contents.kill_timestamp || 0) * 1000,
-              txDigest: "N/A"
+              locationId: solarSystemId,
+              locationName: getStarSystemName(solarSystemId),
+              timestamp: Number(json.kill_timestamp || 0) * 1000, // Unix seconds → ms
+              txDigest: ev.txDigest,
+              role: isKiller ? "killer" : "victim",
+              detail: isKiller
+                ? `Killed ${json.victim_id?.item_id || "unknown"}`
+                : `Killed by ${json.killer_id?.item_id || "unknown"}`,
             });
+            continue;
           }
-        }
 
-        // Parse Interactions
-        for (const ev of eventsResult.data) {
-          let eventType: TimelineEvent["type"] = "Unknown";
-          let locId = "Unknown";
-          const json = ev.parsedJson as Record<string, any>;
-
+          // ── JumpEvent ──
           if (ev.type.includes("::gate::JumpEvent")) {
-            if (String(json.character_id) !== String(targetCharacterId)) continue;
-            eventType = "Jump";
-            locId = json.source_gate_id || "Unknown Gate";
-          } else if (ev.type.includes("::inventory::ItemDepositedEvent")) {
-            if (String(json.character_id) !== String(targetCharacterId)) continue;
-            eventType = "Deposit";
-            locId = json.assembly_id || "Unknown SSU";
-          } else if (ev.type.includes("::inventory::ItemWithdrawnEvent")) {
-            if (String(json.character_id) !== String(targetCharacterId)) continue;
-            eventType = "Withdraw";
-            locId = json.assembly_id || "Unknown SSU";
-          } else {
-            continue; // Skip unrecognized events
+            if (
+              !matchesTarget(
+                targetCharacterId,
+                json.character_id,
+                json.character_key
+              )
+            )
+              continue;
+
+            const destGateId = json.destination_gate_id || "";
+            const destGateItemId = String(
+              json.destination_gate_key?.item_id || ""
+            );
+            const srcGateItemId = String(
+              json.source_gate_key?.item_id || ""
+            );
+
+            compiled.push({
+              id: `jump-${ev.txDigest}-${ev.eventSeq}`,
+              type: "Jump",
+              locationId: destGateId,
+              locationName: destGateId
+                ? `Gate ${destGateId.slice(0, 8)}…`
+                : "Unknown Gate",
+              timestamp: Number(ev.timestampMs || 0),
+              txDigest: ev.txDigest,
+              role: "traveler",
+              detail: `From gate ${srcGateItemId} → ${destGateItemId}`,
+            });
+            continue;
           }
 
-          compiledTimeline.push({
-            id: ev.id.txDigest + "-" + ev.id.eventSeq,
-            type: eventType,
-            locationId: locId,
-            locationName: locId.startsWith("0x") ? `Gate ${locId.slice(0, 6)}` : getStarSystemName(locId),
-            timestamp: Number(ev.timestampMs || 0),
-            txDigest: ev.id.txDigest
-          });
+          // ── ItemDepositedEvent ──
+          if (ev.type.includes("::inventory::ItemDepositedEvent")) {
+            if (
+              !matchesTarget(
+                targetCharacterId,
+                json.character_id,
+                json.character_key
+              )
+            )
+              continue;
+
+            const assemblyId = json.assembly_id || "";
+            const assemblyItemId = String(
+              json.assembly_key?.item_id || ""
+            );
+
+            compiled.push({
+              id: `dep-${ev.txDigest}-${ev.eventSeq}`,
+              type: "Deposit",
+              locationId: assemblyId,
+              locationName: assemblyId
+                ? `SSU ${assemblyId.slice(0, 8)}…`
+                : "Unknown SSU",
+              timestamp: Number(ev.timestampMs || 0),
+              txDigest: ev.txDigest,
+              role: "depositor",
+              detail: `Deposited ${json.quantity || "?"} items (type ${json.type_id || "?"}) at assembly ${assemblyItemId}`,
+            });
+            continue;
+          }
+
+          // ── ItemWithdrawnEvent ──
+          if (ev.type.includes("::inventory::ItemWithdrawnEvent")) {
+            if (
+              !matchesTarget(
+                targetCharacterId,
+                json.character_id,
+                json.character_key
+              )
+            )
+              continue;
+
+            const assemblyId = json.assembly_id || "";
+            const assemblyItemId = String(
+              json.assembly_key?.item_id || ""
+            );
+
+            compiled.push({
+              id: `wd-${ev.txDigest}-${ev.eventSeq}`,
+              type: "Withdraw",
+              locationId: assemblyId,
+              locationName: assemblyId
+                ? `SSU ${assemblyId.slice(0, 8)}…`
+                : "Unknown SSU",
+              timestamp: Number(ev.timestampMs || 0),
+              txDigest: ev.txDigest,
+              role: "withdrawer",
+              detail: `Withdrew ${json.quantity || "?"} items (type ${json.type_id || "?"}) from assembly ${assemblyItemId}`,
+            });
+            continue;
+          }
         }
 
         // Sort descending by time
-        compiledTimeline.sort((a, b) => b.timestamp - a.timestamp);
-        setTimeline(compiledTimeline);
+        compiled.sort((a, b) => b.timestamp - a.timestamp);
 
+        if (!cancelled) {
+          setTimeline(compiled);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch tactical timeline");
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to fetch tactical timeline"
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    fetchChronology();
+    fetchTimeline();
+
+    return () => {
+      cancelled = true;
+    };
   }, [targetCharacterId]);
 
-  // Provide backward compatibility for existing code using lastSeen directly
-  const lastSeen = timeline.length > 0 ? {
-    solarSystemId: timeline[0].locationId,
-    timestamp: timeline[0].timestamp
-  } : null;
+  // Backward compatibility: lastSeen = the most recent event with a solar system location
+  const lastSeen = (() => {
+    // Prefer killmails since they have the most precise location data (solar system)
+    const killmailEvent = timeline.find((e) => e.type === "Killmail");
+    if (killmailEvent) {
+      return {
+        solarSystemId: killmailEvent.locationId,
+        timestamp: killmailEvent.timestamp,
+      };
+    }
+    // Fall back to any event
+    if (timeline.length > 0) {
+      return {
+        solarSystemId: timeline[0].locationId,
+        timestamp: timeline[0].timestamp,
+      };
+    }
+    return null;
+  })();
 
   return { lastSeen, timeline, loading, error };
 }

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { getObjectWithJson } from "@evefrontier/dapp-kit";
-import { EVE_COIN_TYPE, KILLMAIL_REGISTRY_ID } from "../constants";
+import { EVE_COIN_TYPE } from "../constants";
+import { fetchEventsBatch, fetchBalanceAndObjects, UTOPIA_EVENT_TYPES } from "../utils/suiClient";
 
 export interface TacticalReport {
   targetId: string;
@@ -66,89 +67,47 @@ export function useThreatAnalysis() {
         }
       }
 
-      // 2. Prepare Parallel On-Chain Queries
-      
-      // Query A: LUX Balance via RPC
-      const rpcFetch = fetch("https://fullnode.testnet.sui.io:443", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "suix_getBalance",
-          params: [walletAddress, EVE_COIN_TYPE]
-        })
-      }).then(res => res.json()).catch(() => null);
-
-      // Query B: Recent 50 Killmails globally via GraphQL
-      const killmailQuery = `
-        query GetLastSeenKillmail($registryId: SuiAddress!) {
-          object(address: $registryId) {
-            dynamicFields(first: 50) {
-              nodes {
-                name { type { repr } json }
-                value {
-                  ... on MoveValue { type { repr } json }
-                  ... on MoveObject { contents { type { repr } json } }
-                }
-              }
-            }
-          }
-        }
-      `;
-      const gqlFetch = fetch(import.meta.env.VITE_SUI_GRAPHQL_ENDPOINT || "https://graphql.testnet.sui.io/graphql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: killmailQuery, variables: { registryId: KILLMAIL_REGISTRY_ID } }),
-      }).then(res => res.json()).catch(() => null);
-
-      // Query C: Character-Owned Objects (Smart Assemblies, SSUs, Turrets, etc.)
-      const ownedObjectsFetch = fetch("https://fullnode.testnet.sui.io:443", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "suix_getOwnedObjects",
-          params: [
-            targetCharacterId, // The character itself is the owner of OwnerCaps
-            { options: { showType: true } },
-            null,
-            50 
-          ]
-        })
-      }).then(res => res.json()).catch(() => null);
-
-      const [rpcData, kmData, ownedData] = await Promise.all([rpcFetch, gqlFetch, ownedObjectsFetch]);
+      // 2. Combined GraphQL queries — balance + objects + killmail events
+      const [{ balance, objects }, killmailEvents] = await Promise.all([
+        // GraphQL: balance + owned objects in one request
+        fetchBalanceAndObjects(walletAddress, EVE_COIN_TYPE, targetCharacterId),
+        // GraphQL: killmail events
+        fetchEventsBatch([UTOPIA_EVENT_TYPES.killmailCreated], 50),
+      ]);
 
       // Parse Balance
       let eveBalance = 0;
-      if (rpcData?.result?.totalBalance) {
-        // 9 decimals for EVE Coin (standard Sui token decimal)
-        eveBalance = Number(rpcData.result.totalBalance) / 1_000_000_000;
+      if (balance?.totalBalance) {
+        eveBalance = Number(balance.totalBalance) / 1_000_000_000;
       }
 
-      // Parse PvP Activity (Kills / Deaths)
+      // Parse PvP Activity — match by killer_id.item_id / victim_id.item_id (TenantItemId)
       let recentKills = 0;
       let recentDeaths = 0;
-      const kmNodes = kmData?.data?.object?.dynamicFields?.nodes || [];
-      for (const node of kmNodes) {
-        const kmJson = node.value?.contents?.json || node.value?.json;
-        if (!kmJson || !kmJson.killer_id || !kmJson.victim_id) continue;
-        
-        // Ensure string comparison for u64 IDs
-        if (String(kmJson.killer_id) === String(targetCharacterId)) recentKills++;
-        if (String(kmJson.victim_id) === String(targetCharacterId)) recentDeaths++;
+      for (const ev of killmailEvents) {
+        const kmJson = ev.parsedJson;
+        if (!kmJson?.killer_id || !kmJson?.victim_id) continue;
+
+        // Match by u64 item_id (TenantItemId) against character's u64 ID
+        const killerId = String(kmJson.killer_id.item_id || "");
+        const victimId = String(kmJson.victim_id.item_id || "");
+
+        if (killerId === charU64) recentKills++;
+        if (victimId === charU64) recentDeaths++;
+
+        // Also match by Sui Object ID (targetCharacterId) if it's a hex address
+        if (targetCharacterId.startsWith("0x")) {
+          // For killmails, the character_id field is not present,
+          // only killer_id/victim_id as TenantItemId, so u64 match is primary
+        }
       }
 
       // Parse Smart Deployments & Infrastructure
-      // We look for OwnerCap<...::turret::Turret>, OwnerCap<...::storage_unit::StorageUnit>, etc.
-      let logisticsActivity = 0; // Represents Storage Units (SSUs)
-      let assembliesDetected = 0; // Represents Turrets, Gates, Power Nodes
+      let logisticsActivity = 0;
+      let assembliesDetected = 0;
       
-      const objects = ownedData?.result?.data || [];
       for (const obj of objects) {
-        const typeStr = obj.data?.type || "";
+        const typeStr = obj.type || "";
         if (typeStr.includes("::storage_unit::StorageUnit")) {
           logisticsActivity++;
         }
@@ -172,15 +131,13 @@ export function useThreatAnalysis() {
       
       const totalEngagements = recentKills + recentDeaths;
       if (totalEngagements > 0) {
-        score += 1; // Base active combatant bonus
+        score += 1;
       }
 
       // Territorial Control & Base Building
-      // SSUs indicate massive logistics
       if (logisticsActivity >= 2) score += 3;
       else if (logisticsActivity === 1) score += 1.5;
 
-      // Turrets and Gates are extreme threat multipliers
       if (assembliesDetected > 0) {
         score += (assembliesDetected * 2.0);
       }

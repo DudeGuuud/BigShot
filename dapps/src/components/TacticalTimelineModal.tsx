@@ -61,7 +61,11 @@ export function TacticalTimelineModal({ targetCharacterId, targetName, open, onO
 
                     <Flex justify="between" align="center" mb="1">
                       <Flex gap="2" align="center">
-                        {event.type === 'Killmail' && <Badge color="red" variant="soft">Killmail</Badge>}
+                        {event.type === 'Killmail' && (
+                          <Badge color={event.role === 'killer' ? 'orange' : 'red'} variant="soft">
+                            {event.role === 'killer' ? 'Kill' : 'Death'}
+                          </Badge>
+                        )}
                         {event.type === 'Jump' && <Badge color="teal" variant="soft">Gate Jump</Badge>}
                         {event.type === 'Deposit' && <Badge color="blue" variant="soft">Item Deposit</Badge>}
                         {event.type === 'Withdraw' && <Badge color="orange" variant="soft">Item Withdraw</Badge>}
@@ -75,22 +79,25 @@ export function TacticalTimelineModal({ targetCharacterId, targetName, open, onO
                       {event.type === 'Killmail' && (
                         <Flex direction="column" gap="1">
                           <Text size="2"><b>Location:</b> <Text color="yellow">{event.locationName}</Text> <Text size="1" color="gray">({event.locationId})</Text></Text>
-                          <Text size="2" color="gray">Killmail ID: <a href={`https://explorer.sui.io/object/${(event.id || "").split('-').pop()}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>View on Explorer</a></Text>
+                          {event.detail && <Text size="2" color="gray">{event.detail}</Text>}
+                          <Text size="2" color="gray">Tx: <a href={`https://suiscan.xyz/testnet/tx/${event.txDigest}`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 10)}…</a></Text>
                         </Flex>
                       )}
                       {event.type === 'Jump' && (
                         <Flex direction="column" gap="1">
-                          <Text size="2"><b>Arrival:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          <Text size="2"><b>Arrived at:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          {event.detail && <Text size="2" color="gray">{event.detail}</Text>}
                           {event.txDigest && (
-                            <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
+                            <Text size="2" color="gray">Tx: <a href={`https://suiscan.xyz/testnet/tx/${event.txDigest}`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 10)}…</a></Text>
                           )}
                         </Flex>
                       )}
                       {(event.type === 'Deposit' || event.type === 'Withdraw') && (
                         <Flex direction="column" gap="1">
-                          <Text size="2"><b>Sector/Unit:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          <Text size="2"><b>Assembly:</b> <Text color="yellow">{event.locationName}</Text></Text>
+                          {event.detail && <Text size="2" color="gray">{event.detail}</Text>}
                           {event.txDigest && (
-                            <Text size="2" color="gray">Tx: <a href={`https://explorer.sui.io/txblock/${event.txDigest}?network=testnet`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 8)}...</a></Text>
+                            <Text size="2" color="gray">Tx: <a href={`https://suiscan.xyz/testnet/tx/${event.txDigest}`} target="_blank" rel="noreferrer" style={{color: 'var(--accent-a11)'}}>{event.txDigest.slice(0, 10)}…</a></Text>
                           )}
                         </Flex>
                       )}
