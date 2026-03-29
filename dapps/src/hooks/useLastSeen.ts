@@ -1,22 +1,15 @@
 /**
  * useLastSeen — Tactical Timeline hook.
  *
- * Fetches all on-chain activity for a target character:
- * - KillmailCreatedEvent (combat kills/deaths)
- * - JumpEvent (gate travel)
- * - ItemDepositedEvent (SSU interactions)
- * - ItemWithdrawnEvent (SSU interactions)
- *
- * All event queries are batched into a single HTTP request via JSON-RPC batch.
- *
- * Target matching:
- * - Events use `character_id` (Sui Object ID, hex) and `character_key.item_id` (u64 string)
- * - Killmails use `killer_id.item_id` / `victim_id.item_id` (u64 strings)
- * - We match against BOTH formats to maximize coverage
+ * Fetches on-chain activity for a specific target character:
+ * - Jump/Deposit/Withdraw: server-side filtered by sender=walletAddress
+ * - Killmail: client-side filtered by character item_id (small limit)
+ * All combined in 1 GraphQL request.
  */
 
 import { useState, useEffect } from "react";
-import { fetchEventsBatch, UTOPIA_EVENT_TYPES } from "../utils/suiClient";
+import { fetchTargetedEvents } from "../utils/suiClient";
+import { resolveWalletAddress, resolveCharacterItemId } from "../utils/characterNameCache";
 import { getStarSystemName } from "../utils/systems";
 
 export type TimelineEvent = {
@@ -26,34 +19,9 @@ export type TimelineEvent = {
   locationName: string;
   timestamp: number;
   txDigest: string;
-  /** Role of the target in this event */
   role?: "killer" | "victim" | "traveler" | "depositor" | "withdrawer";
-  /** Additional context (e.g., gate IDs, item types) */
   detail?: string;
 };
-
-/**
- * Check if a target ID matches a character in an event.
- * Events have both `character_id` (Sui hex ID) and `character_key.item_id` (u64).
- * The target could be either format depending on how the bounty stores it.
- */
-function matchesTarget(
-  targetId: string,
-  suiObjectId: string | undefined,
-  tenantItemId: { item_id?: string } | undefined
-): boolean {
-  if (!targetId) return false;
-  const targetNorm = targetId.toLowerCase();
-
-  // Match Sui Object ID
-  if (suiObjectId && suiObjectId.toLowerCase() === targetNorm) return true;
-
-  // Match u64 item_id
-  if (tenantItemId?.item_id && String(tenantItemId.item_id) === targetId)
-    return true;
-
-  return false;
-}
 
 export function useLastSeen(targetCharacterId: string) {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
@@ -72,15 +40,21 @@ export function useLastSeen(targetCharacterId: string) {
       setLoading(true);
       setError(null);
       try {
-        // ── Single batched RPC call for ALL event types ──
-        const events = await fetchEventsBatch(
-          [
-            UTOPIA_EVENT_TYPES.killmailCreated,
-            UTOPIA_EVENT_TYPES.jump,
-            UTOPIA_EVENT_TYPES.itemDeposited,
-            UTOPIA_EVENT_TYPES.itemWithdrawn,
-          ],
-          50 // per event type
+        // Resolve character ID to canonical formats:
+        // - u64 item_id (for killmail matching)
+        // - wallet address (for sender-based server-side filtering)
+        const [itemId, walletAddress] = await Promise.all([
+          resolveCharacterItemId(targetCharacterId),
+          resolveWalletAddress(targetCharacterId),
+        ]);
+
+        const effectiveItemId = itemId || targetCharacterId;
+
+        // Single GraphQL request with targeted filters
+        const events = await fetchTargetedEvents(
+          walletAddress,
+          effectiveItemId,
+          25
         );
 
         if (cancelled) return;
@@ -92,27 +66,17 @@ export function useLastSeen(targetCharacterId: string) {
 
           // ── KillmailCreatedEvent ──
           if (ev.type.includes("::killmail::KillmailCreatedEvent")) {
-            const isKiller = matchesTarget(
-              targetCharacterId,
-              undefined,
-              json.killer_id
-            );
-            const isVictim = matchesTarget(
-              targetCharacterId,
-              undefined,
-              json.victim_id
-            );
+            const isKiller = String(json.killer_id?.item_id || "") === effectiveItemId;
+            const isVictim = String(json.victim_id?.item_id || "") === effectiveItemId;
             if (!isKiller && !isVictim) continue;
 
-            const solarSystemId = String(
-              json.solar_system_id?.item_id || ""
-            );
+            const solarSystemId = String(json.solar_system_id?.item_id || "");
             compiled.push({
               id: `km-${ev.txDigest}-${ev.eventSeq}`,
               type: "Killmail",
               locationId: solarSystemId,
               locationName: getStarSystemName(solarSystemId),
-              timestamp: Number(json.kill_timestamp || 0) * 1000, // Unix seconds → ms
+              timestamp: Number(json.kill_timestamp || 0) * 1000,
               txDigest: ev.txDigest,
               role: isKiller ? "killer" : "victim",
               detail: isKiller
@@ -122,24 +86,11 @@ export function useLastSeen(targetCharacterId: string) {
             continue;
           }
 
-          // ── JumpEvent ──
+          // ── JumpEvent (already server-filtered by sender) ──
           if (ev.type.includes("::gate::JumpEvent")) {
-            if (
-              !matchesTarget(
-                targetCharacterId,
-                json.character_id,
-                json.character_key
-              )
-            )
-              continue;
-
             const destGateId = json.destination_gate_id || "";
-            const destGateItemId = String(
-              json.destination_gate_key?.item_id || ""
-            );
-            const srcGateItemId = String(
-              json.source_gate_key?.item_id || ""
-            );
+            const destGateItemId = String(json.destination_gate_key?.item_id || "");
+            const srcGateItemId = String(json.source_gate_key?.item_id || "");
 
             compiled.push({
               id: `jump-${ev.txDigest}-${ev.eventSeq}`,
@@ -156,21 +107,10 @@ export function useLastSeen(targetCharacterId: string) {
             continue;
           }
 
-          // ── ItemDepositedEvent ──
+          // ── ItemDepositedEvent (already server-filtered by sender) ──
           if (ev.type.includes("::inventory::ItemDepositedEvent")) {
-            if (
-              !matchesTarget(
-                targetCharacterId,
-                json.character_id,
-                json.character_key
-              )
-            )
-              continue;
-
             const assemblyId = json.assembly_id || "";
-            const assemblyItemId = String(
-              json.assembly_key?.item_id || ""
-            );
+            const assemblyItemId = String(json.assembly_key?.item_id || "");
 
             compiled.push({
               id: `dep-${ev.txDigest}-${ev.eventSeq}`,
@@ -187,21 +127,10 @@ export function useLastSeen(targetCharacterId: string) {
             continue;
           }
 
-          // ── ItemWithdrawnEvent ──
+          // ── ItemWithdrawnEvent (already server-filtered by sender) ──
           if (ev.type.includes("::inventory::ItemWithdrawnEvent")) {
-            if (
-              !matchesTarget(
-                targetCharacterId,
-                json.character_id,
-                json.character_key
-              )
-            )
-              continue;
-
             const assemblyId = json.assembly_id || "";
-            const assemblyItemId = String(
-              json.assembly_key?.item_id || ""
-            );
+            const assemblyItemId = String(json.assembly_key?.item_id || "");
 
             compiled.push({
               id: `wd-${ev.txDigest}-${ev.eventSeq}`,
@@ -219,7 +148,6 @@ export function useLastSeen(targetCharacterId: string) {
           }
         }
 
-        // Sort descending by time
         compiled.sort((a, b) => b.timestamp - a.timestamp);
 
         if (!cancelled) {
@@ -247,9 +175,7 @@ export function useLastSeen(targetCharacterId: string) {
     };
   }, [targetCharacterId]);
 
-  // Backward compatibility: lastSeen = the most recent event with a solar system location
   const lastSeen = (() => {
-    // Prefer killmails since they have the most precise location data (solar system)
     const killmailEvent = timeline.find((e) => e.type === "Killmail");
     if (killmailEvent) {
       return {
@@ -257,7 +183,6 @@ export function useLastSeen(targetCharacterId: string) {
         timestamp: killmailEvent.timestamp,
       };
     }
-    // Fall back to any event
     if (timeline.length > 0) {
       return {
         solarSystemId: timeline[0].locationId,

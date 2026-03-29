@@ -1,14 +1,12 @@
 /**
- * Shared Sui query utilities — GraphQL only.
+ * Shared Sui GraphQL query utilities.
  *
- * Migrated from JSON-RPC per Sui SDK 2.0 guidelines:
- * https://sdk.mystenlabs.com/sui/migrations/sui-2.0/json-rpc-migration
+ * Migrated from JSON-RPC per Sui SDK 2.0 guidelines.
  *
- * Uses GraphQL for ALL queries:
- * - Events: combined via aliases in a single request
- * - Balance: via address query
- * - Owned objects: via address query
- * - Dynamic fields: via object query
+ * Event query strategy for targeted fetching:
+ * - Jump/Deposit/Withdraw: filtered by `sender: walletAddress` (server-side)
+ * - Killmail: filtered by `item_id` (client-side, small limit)
+ * All combined into a single GraphQL request via aliases.
  */
 
 import { GRAPHQL_URL, WORLD_PACKAGE_ID } from "../constants";
@@ -25,9 +23,6 @@ export interface ParsedEvent {
 
 // ─── Core GraphQL ────────────────────────────────────────────────────────────
 
-/**
- * Execute a GraphQL query against the Sui GraphQL endpoint.
- */
 export async function graphqlQuery<T = any>(
   query: string,
   variables?: Record<string, any>
@@ -45,33 +40,126 @@ export async function graphqlQuery<T = any>(
   return json.data as T;
 }
 
-// ─── Event Queries (GraphQL with aliases) ────────────────────────────────────
+// ─── Event Node Fragment ─────────────────────────────────────────────────────
+
+const EVENT_NODE_FIELDS = `
+  timestamp
+  sequenceNumber
+  contents { type { repr } json }
+  transaction { digest }
+`;
+
+// ─── Targeted Event Fetching ─────────────────────────────────────────────────
 
 /**
- * Build a GraphQL fragment for querying events of a single type.
- * Returns the fragment string and its alias name.
+ * Fetch events targeted to a specific character.
+ *
+ * Strategy:
+ * - Jump/Deposit/Withdraw events are filtered server-side by `sender: walletAddress`
+ *   because the player's wallet submits these transactions.
+ * - Killmail events are fetched with a small limit and filtered client-side by
+ *   `killer_id.item_id` / `victim_id.item_id`, because killmails are created by
+ *   the game server (not the player's wallet).
+ *
+ * All queries are combined into 1 GraphQL request via aliases.
+ *
+ * @param walletAddress - The player's wallet address (for server-side sender filter)
+ * @param characterItemId - The u64 item_id (for client-side killmail filter)
+ * @param limit - Max events per type
  */
-function buildEventAlias(alias: string, eventType: string, limit: number): string {
-  return `
-    ${alias}: events(
+export async function fetchTargetedEvents(
+  walletAddress: string | null,
+  characterItemId: string,
+  limit: number = 25
+): Promise<ParsedEvent[]> {
+  const parts: string[] = [];
+
+  // Killmail: always fetched (small limit), filtered client-side
+  parts.push(`
+    killmails: events(
       last: ${limit}
-      filter: { eventType: "${eventType}" }
-    ) {
-      nodes {
-        timestamp
-        type { repr }
-        json
-        sendingModule { package { address } name }
-      }
+      filter: { type: "${WORLD_PACKAGE_ID}::killmail::KillmailCreatedEvent" }
+    ) { nodes { ${EVENT_NODE_FIELDS} } }
+  `);
+
+  // Jump/Deposit/Withdraw: only if we have walletAddress for sender filter
+  if (walletAddress) {
+    parts.push(`
+      jumps: events(
+        last: ${limit}
+        filter: {
+          type: "${WORLD_PACKAGE_ID}::gate::JumpEvent"
+          sender: "${walletAddress}"
+        }
+      ) { nodes { ${EVENT_NODE_FIELDS} } }
+    `);
+
+    parts.push(`
+      deposits: events(
+        last: ${limit}
+        filter: {
+          type: "${WORLD_PACKAGE_ID}::inventory::ItemDepositedEvent"
+          sender: "${walletAddress}"
+        }
+      ) { nodes { ${EVENT_NODE_FIELDS} } }
+    `);
+
+    parts.push(`
+      withdrawals: events(
+        last: ${limit}
+        filter: {
+          type: "${WORLD_PACKAGE_ID}::inventory::ItemWithdrawnEvent"
+          sender: "${walletAddress}"
+        }
+      ) { nodes { ${EVENT_NODE_FIELDS} } }
+    `);
+  }
+
+  const query = `query TargetedEvents { ${parts.join("\n")} }`;
+  const data = await graphqlQuery(query);
+
+  const allEvents: ParsedEvent[] = [];
+
+  // Parse helper
+  const parseNodes = (nodes: any[]) => {
+    for (const node of nodes) {
+      const typeRepr = node.contents?.type?.repr || "";
+      const jsonData = node.contents?.json || {};
+
+      allEvents.push({
+        type: typeRepr,
+        parsedJson: typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData,
+        timestampMs: node.timestamp
+          ? String(new Date(node.timestamp).getTime())
+          : "0",
+        txDigest: node.transaction?.digest || "",
+        eventSeq: String(node.sequenceNumber ?? 0),
+      });
     }
-  `;
+  };
+
+  // Parse all aliases
+  if (data?.killmails?.nodes) parseNodes(data.killmails.nodes);
+  if (data?.jumps?.nodes) parseNodes(data.jumps.nodes);
+  if (data?.deposits?.nodes) parseNodes(data.deposits.nodes);
+  if (data?.withdrawals?.nodes) parseNodes(data.withdrawals.nodes);
+
+  // Client-side filter for killmails: only keep events involving this character
+  return allEvents.filter((ev) => {
+    if (ev.type.includes("::killmail::KillmailCreatedEvent")) {
+      const killerId = String(ev.parsedJson.killer_id?.item_id || "");
+      const victimId = String(ev.parsedJson.victim_id?.item_id || "");
+      return killerId === characterItemId || victimId === characterItemId;
+    }
+    // Jump/Deposit/Withdraw are already server-filtered by sender
+    return true;
+  });
 }
 
+// ─── Generic Event Batch (for threat analysis, etc.) ─────────────────────────
+
 /**
- * Fetch events of multiple types in a SINGLE GraphQL request using aliases.
- * Each event type becomes a separate aliased query combined into one HTTP call.
- *
- * Example: 4 event types → 1 HTTP request with 4 aliased sub-queries.
+ * Fetch events by type without sender filter (for global queries like threat analysis).
  */
 export async function fetchEventsBatch(
   eventTypes: string[],
@@ -79,37 +167,33 @@ export async function fetchEventsBatch(
 ): Promise<ParsedEvent[]> {
   if (eventTypes.length === 0) return [];
 
-  // Build combined query with aliases
-  const aliases = eventTypes.map((type, i) => {
-    const alias = `ev_${i}`;
-    return buildEventAlias(alias, type, limit);
-  });
+  const aliases = eventTypes.map((type, i) => `
+    ev_${i}: events(
+      last: ${limit}
+      filter: { type: "${type}" }
+    ) { nodes { ${EVENT_NODE_FIELDS} } }
+  `);
 
-  const query = `query FetchAllEvents { ${aliases.join("\n")} }`;
-
+  const query = `query FetchEvents { ${aliases.join("\n")} }`;
   const data = await graphqlQuery(query);
 
-  // Parse all aliased results into flat event array
   const allEvents: ParsedEvent[] = [];
-
   for (let i = 0; i < eventTypes.length; i++) {
-    const alias = `ev_${i}`;
-    const nodes = data?.[alias]?.nodes || [];
-
+    const nodes = data?.[`ev_${i}`]?.nodes || [];
     for (const node of nodes) {
-      const typeRepr = node.type?.repr || eventTypes[i];
-      const jsonData = node.json || {};
-
       allEvents.push({
-        type: typeRepr,
-        parsedJson: typeof jsonData === "string" ? JSON.parse(jsonData) : jsonData,
-        timestampMs: node.timestamp ? String(new Date(node.timestamp).getTime()) : "0",
-        txDigest: "", // GraphQL events don't directly expose txDigest in this schema
-        eventSeq: String(i),
+        type: node.contents?.type?.repr || eventTypes[i],
+        parsedJson: typeof node.contents?.json === "string"
+          ? JSON.parse(node.contents.json)
+          : (node.contents?.json || {}),
+        timestampMs: node.timestamp
+          ? String(new Date(node.timestamp).getTime())
+          : "0",
+        txDigest: node.transaction?.digest || "",
+        eventSeq: String(node.sequenceNumber ?? i),
       });
     }
   }
-
   return allEvents;
 }
 
@@ -124,31 +208,25 @@ export interface OwnedObjectInfo {
   objectId: string;
 }
 
-/**
- * Fetch balance and owned objects for an address in a single GraphQL request.
- */
 export async function fetchBalanceAndObjects(
   ownerAddress: string,
   coinType: string,
   objectOwner?: string
 ): Promise<{ balance: BalanceResult; objects: OwnedObjectInfo[] }> {
-  // If objectOwner is different from walletAddress (e.g. character ID owns OwnerCaps)
   const objectsOwner = objectOwner || ownerAddress;
 
   const query = `
     query BalanceAndObjects($addr: SuiAddress!, $coinType: String!, $objOwner: SuiAddress!) {
       walletBalance: address(address: $addr) {
-        balance(type: $coinType) {
+        balance(coinType: $coinType) {
           totalBalance
         }
       }
-      ownedObjects: owner(address: $objOwner) {
+      ownedObjects: address(address: $objOwner) {
         objects(first: 50) {
           nodes {
             address
-            asMoveObject {
-              contents { type { repr } }
-            }
+            contents { type { repr } }
           }
         }
       }
@@ -168,7 +246,7 @@ export async function fetchBalanceAndObjects(
   const objects: OwnedObjectInfo[] = [];
   const nodes = data?.ownedObjects?.objects?.nodes || [];
   for (const node of nodes) {
-    const typeStr = node.asMoveObject?.contents?.type?.repr || "";
+    const typeStr = node.contents?.type?.repr || "";
     if (typeStr) {
       objects.push({ type: typeStr, objectId: node.address || "" });
     }
@@ -179,32 +257,9 @@ export async function fetchBalanceAndObjects(
 
 // ─── Convenience: Utopia Event Types ─────────────────────────────────────────
 
-/** All trackable event types for the Utopia world package */
 export const UTOPIA_EVENT_TYPES = {
   killmailCreated: `${WORLD_PACKAGE_ID}::killmail::KillmailCreatedEvent`,
   jump: `${WORLD_PACKAGE_ID}::gate::JumpEvent`,
   itemDeposited: `${WORLD_PACKAGE_ID}::inventory::ItemDepositedEvent`,
   itemWithdrawn: `${WORLD_PACKAGE_ID}::inventory::ItemWithdrawnEvent`,
 } as const;
-
-// ─── In-Memory Cache ─────────────────────────────────────────────────────────
-
-const cache = new Map<string, { data: any; expiry: number }>();
-
-/**
- * Cache wrapper with TTL (ms).
- */
-export async function cached<T>(
-  key: string,
-  ttlMs: number,
-  fetcher: () => Promise<T>
-): Promise<T> {
-  const now = Date.now();
-  const entry = cache.get(key);
-  if (entry && entry.expiry > now) {
-    return entry.data as T;
-  }
-  const data = await fetcher();
-  cache.set(key, { data, expiry: now + ttlMs });
-  return data;
-}
