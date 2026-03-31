@@ -3,7 +3,7 @@ import { getObjectWithJson } from "@evefrontier/dapp-kit";
 import { SUI_COIN_TYPE, EVE_COIN_TYPE } from "../constants";
 import { OnChainBounty } from "./useBounties";
 import { formatTokenAmount } from "../utils/formatters";
-import { resolveCharacterName } from "../utils/characterNameCache";
+import { resolveCharacter } from "../utils/characterNameCache";
 
 const THREAT_MAP: Record<number, "S" | "A" | "B" | "C" | "D"> = {
   4: "S",
@@ -45,19 +45,25 @@ export function useBountyDetail(objectId: string) {
         const expiryMs = Number(json?.expiry_timestamp_ms ?? 0);
         const rewardRaw = Number(json?.reward_pool?.value ?? json?.reward_pool ?? 0);
 
-        // Resolve pilot name via shared cache (single lightweight call)
+        // Resolve pilot name and Sui info via shared cache (single lightweight call)
         const targetId = String(json.target_character_id || "");
         let pilotAlias = `PILOT-${targetId.slice(-4)}`;
+        let targetCharacterSuiId: string | undefined = targetId.startsWith("0x") ? targetId : undefined;
         try {
-          pilotAlias = await resolveCharacterName(targetId);
+          const charInfo = await resolveCharacter(targetId);
+          if (charInfo) {
+            pilotAlias = charInfo.name || pilotAlias;
+            targetCharacterSuiId = charInfo.suiObjectId;
+          }
         } catch (e) {
-          console.warn("Failed to resolve pilot alias for detail view:", e);
+          console.warn("Failed to resolve pilot details for detail view:", e);
         }
 
         setBounty({
           id: objectId,
           issuer: String(json?.issuer ?? ""),
           targetCharacterId: targetId,
+          targetCharacterSuiId,
           rewardAmount: formatTokenAmount(rewardRaw),
           rewardRaw,
           coinType,

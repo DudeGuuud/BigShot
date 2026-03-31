@@ -83,7 +83,7 @@ export function ListPage() {
                 <tr>
                   <th>Threat</th>
                   <th>Pilot</th>
-                  <th>Target ID</th>
+                  <th>In-game ID</th>
                   <th>Reward</th>
                   <th>Issuer</th>
                   <th style={{ textAlign: "right" }}>Status</th>
@@ -101,7 +101,13 @@ export function ListPage() {
                   const isExpired = Date.now() > b.expiryTimestampMs;
                   const status = b.isClaimed ? "Claimed" : isExpired ? "Expired" : "Active";
                   return (
-                    <tr key={b.id} style={{ cursor: "pointer" }}>
+                    <tr 
+                      key={b.id} 
+                      style={{ cursor: "pointer", transition: "background 0.2s" }}
+                      onClick={() => window.location.hash = `/bounty/${b.id}`}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(250,250,229,0.03)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
                       <td><ThreatBadge level={b.threatClass} /></td>
                       <td>
                          <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "var(--brand)" }}>
@@ -109,12 +115,26 @@ export function ListPage() {
                          </span>
                       </td>
                       <td>
-                        <a href={`#/bounty/${b.id}`} onClick={(e) => e.stopPropagation()} style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
                           <span style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.8rem", opacity: 0.7 }}>
-                            {b.targetCharacterId}
-                            <ArrowUpRight size={10} style={{ color: "var(--brand)", opacity: 0.4 }} />
+                            {b.targetCharacterSuiId ? (
+                              <a
+                                href={`https://suiscan.xyz/testnet/object/${b.targetCharacterSuiId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ color: "var(--brand)", textDecoration: "underline", display: "flex", alignItems: "center", gap: "0.4rem" }}
+                              >
+                                {b.targetCharacterId}
+                                <ArrowUpRight size={10} style={{ opacity: 0.8 }} />
+                              </a>
+                            ) : (
+                              <>
+                                {b.targetCharacterId}
+                              </>
+                            )}
                           </span>
-                        </a>
+                        </div>
                       </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "baseline", gap: "0.4rem" }}>

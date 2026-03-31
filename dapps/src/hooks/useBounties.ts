@@ -7,7 +7,7 @@ import {
   SUI_COIN_TYPE,
 } from "../constants";
 import { formatTokenAmount } from "../utils/formatters";
-import { getCharacterNameMap } from "../utils/characterNameCache";
+import { getCharacterMap } from "../utils/characterNameCache";
 
 export interface OnChainBounty {
   id: string;
@@ -22,6 +22,7 @@ export interface OnChainBounty {
   rewardRaw: number;
   isClaimed: boolean;
   pilotAlias: string;
+  targetCharacterSuiId?: string;
 }
 
 const THREAT_MAP: Record<number, "S" | "A" | "B" | "C" | "D"> = {
@@ -76,11 +77,11 @@ export function useBounties() {
         const eveType = `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${EVE_COIN_TYPE}>`;
         const suiType = `${BIGSHOT_PACKAGE_ID}::bigshot::Bounty<${SUI_COIN_TYPE}>`;
 
-        // Fetch bounties and character names in parallel
-        const [eveResult, suiResult, nameMap] = await Promise.all([
+        // Fetch bounties and character map in parallel
+        const [eveResult, suiResult, charMap] = await Promise.all([
           getObjectsByType(eveType),
           getObjectsByType(suiType),
-          getCharacterNameMap(),
+          getCharacterMap(),
         ]);
 
         const eveNodes = eveResult.data?.objects?.nodes ?? [];
@@ -97,12 +98,15 @@ export function useBounties() {
           ),
         ];
 
-        // Apply pilot names from shared cache
+        // Apply pilot names and Sui Object IDs from shared cache
         parsed.forEach(b => {
-           if (nameMap[b.targetCharacterId]) {
-             b.pilotAlias = nameMap[b.targetCharacterId];
+           const charInfo = charMap[b.targetCharacterId];
+           if (charInfo) {
+             b.pilotAlias = charInfo.name || `PILOT-${b.targetCharacterId.slice(-4)}`;
+             b.targetCharacterSuiId = charInfo.suiObjectId;
            } else {
              b.pilotAlias = `PILOT-${b.targetCharacterId.slice(-4)}`;
+             b.targetCharacterSuiId = b.targetCharacterId.startsWith("0x") ? b.targetCharacterId : undefined;
            }
         });
 
